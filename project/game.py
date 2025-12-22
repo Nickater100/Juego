@@ -1,10 +1,16 @@
-from engines.world_engine.world_state import WorldState
-from engines.battle_engine.battle_state import BattleState
 import pygame
+from core.game_state import GameState
+from engines.world_engine.world_state import WorldState
+
 
 class Game:
     def __init__(self, screen):
         self.screen = screen
+
+        # Estado persistente del juego
+        self.game_state = GameState()
+
+        # Estado actual (arranca en mundo)
         self.state = WorldState(self)
 
     def change_state(self, new_state):

@@ -16,7 +16,8 @@ class WorldState:
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 
-        self.player = Unit()
+        px, py = self.game.game_state.get_player_tile()
+        self.player = Unit(tile_x=px, tile_y=py)
         self.controller = MovementController(self.player, self.collision)
 
         self.move_dir = None
@@ -29,12 +30,16 @@ class WorldState:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_w:
                 self.move_dir = (0, -1)
+                self.player.set_facing(0, -1)
             elif event.key == pygame.K_s:
                 self.move_dir = (0, 1)
+                self.player.set_facing(0, 1)
             elif event.key == pygame.K_a:
                 self.move_dir = (-1, 0)
+                self.player.set_facing(-1, 0)
             elif event.key == pygame.K_d:
                 self.move_dir = (1, 0)
+                self.player.set_facing(1, 0)
 
             # primer paso inmediato
             if self.move_dir and not self.player.is_moving:
@@ -52,6 +57,7 @@ class WorldState:
 
     def update(self, dt):
         self.controller.update(dt)
+        self.player.update_sprite(dt)
 
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
 
@@ -64,10 +70,14 @@ class WorldState:
             self.controller.try_move(*self.move_dir)
             self.move_timer = self.initial_delay - self.repeat_delay
 
+        self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
+
+
 
     def render(self, screen):
         screen.fill((0, 0, 0))
 
+        # Dibujar mapa
         for y, row in enumerate(self.map.grid):
             for x, tile in enumerate(row):
                 color = (80, 80, 80) if tile == 1 else (40, 120, 40)
@@ -80,13 +90,5 @@ class WorldState:
                     (world_x, world_y, TILE_SIZE, TILE_SIZE)
                 )
 
-        pygame.draw.rect(
-            screen,
-            (200, 50, 50),
-            (
-                self.player.pixel_x - self.camera.x,
-                self.player.pixel_y - self.camera.y,
-                TILE_SIZE,
-                TILE_SIZE
-            )
-        )
+        # Dibujar protagonista (UNA vez)
+        self.player.draw(screen, self.camera)
