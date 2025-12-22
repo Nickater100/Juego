@@ -36,44 +36,37 @@ class WorldState:
             elif event.key == pygame.K_d:
                 self.move_dir = (1, 0)
 
+            # primer paso inmediato
+            if self.move_dir and not self.player.is_moving:
+                self.controller.try_move(*self.move_dir)
+                self.move_timer = 0
+
         elif event.type == pygame.KEYUP:
-            if event.key in (
-                pygame.K_w, pygame.K_s,
-                pygame.K_a, pygame.K_d
-            ):
+            if event.key in (pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d):
                 self.move_dir = None
                 self.move_timer = 0
 
     def update(self, dt):
         self.controller.update(dt)
 
-        if not self.move_dir:
-            return
+        self.camera.follow(self.player.pixel_x, self.player.pixel_y)
 
-        if self.player.is_moving:
+        if not self.move_dir or self.player.is_moving:
             return
 
         self.move_timer += dt
 
-        self.camera.follow(
-            self.player.pixel_x,
-            self.player.pixel_y
-        )
-
-
-        # Primer paso inmediato
-        if self.move_timer == 0:
-            self.controller.try_move(*self.move_dir)
-
-        # Delay inicial antes del auto-repeat
-        elif self.move_timer >= self.initial_delay:
+        if self.move_timer >= self.initial_delay:
             self.controller.try_move(*self.move_dir)
             self.move_timer = self.initial_delay - self.repeat_delay
 
+
     def render(self, screen):
+        screen.fill((0, 0, 0))
+
         for y, row in enumerate(self.map.grid):
             for x, tile in enumerate(row):
-                color = (80, 80, 80) if tile == 1 else (40, 120, 40)  # 🔹 agregar esta línea
+                color = (80, 80, 80) if tile == 1 else (40, 120, 40)
                 world_x = x * TILE_SIZE - self.camera.x
                 world_y = y * TILE_SIZE - self.camera.y
 
@@ -83,28 +76,13 @@ class WorldState:
                     (world_x, world_y, TILE_SIZE, TILE_SIZE)
                 )
 
-            # Limpiar pantalla antes de dibujar
-            screen.fill((0, 0, 0))
-
-            for y, row in enumerate(self.map.grid):
-                for x, tile in enumerate(row):
-                    color = (80, 80, 80) if tile == 1 else (40, 120, 40)
-                    world_x = x * TILE_SIZE - self.camera.x
-                    world_y = y * TILE_SIZE - self.camera.y
-
-                    pygame.draw.rect(
-                        screen,
-                        color,
-                        (world_x, world_y, TILE_SIZE, TILE_SIZE)
-                    )
-
-            pygame.draw.rect(
-                screen,
-                (200, 50, 50),
-                (
-                    self.player.pixel_x - self.camera.x,
-                    self.player.pixel_y - self.camera.y,
-                    TILE_SIZE,
-                    TILE_SIZE
-                )
+        pygame.draw.rect(
+            screen,
+            (200, 50, 50),
+            (
+                self.player.pixel_x - self.camera.x,
+                self.player.pixel_y - self.camera.y,
+                TILE_SIZE,
+                TILE_SIZE
             )
+        )
