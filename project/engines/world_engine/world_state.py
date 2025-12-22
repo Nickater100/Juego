@@ -46,6 +46,10 @@ class WorldState:
                 self.move_dir = None
                 self.move_timer = 0
 
+            elif event.key == pygame.K_b:
+                from engines.battle_engine.battle_state import BattleState
+                self.game.change_state(BattleState(self.game))
+
     def update(self, dt):
         self.controller.update(dt)
 
