@@ -11,6 +11,7 @@ class PauseState:
         self.small_font = pygame.font.SysFont(None, 24)
 
         self.mode = "menu"  # "menu" o "army"
+        self.selected_unit = None  # para modo ficha
 
         self.options = ["Ejército", "EXIT"]
         self.option_index = 0
@@ -25,6 +26,10 @@ class PauseState:
 
         # --- salir / volver ---
         if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+            if self.mode == "unit":
+                self.mode = "army"
+                self.selected_unit = None
+                return
             if self.mode == "army":
                 self.mode = "menu"
                 return
@@ -41,6 +46,9 @@ class PauseState:
             self._handle_menu_input(event)
         elif self.mode == "army":
             self._handle_army_input(event)
+        elif self.mode == "unit":
+            self._handle_unit_input(event)
+
 
     def _handle_menu_input(self, event):
         if event.key == pygame.K_w:
@@ -55,6 +63,11 @@ class PauseState:
             elif chosen == "EXIT":
                 pygame.quit()
                 sys.exit(0)
+
+    def _handle_unit_input(self, event):
+        # Por ahora no hay acciones, solo navegación (ESC/BACKSPACE vuelve)
+        # Más adelante: equipar, ver habilidades, etc.
+        pass
 
     def _handle_army_input(self, event):
         party = self.game.game_state.party
@@ -79,8 +92,11 @@ class PauseState:
         elif event.key == pygame.K_s:
             y = min(rows - 1, y + 1)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            # por ahora no hace nada (luego: ver stats / equipar)
+            # Abrir ficha del soldado seleccionado
+            self.selected_unit = self.game.game_state.party[self.army_index]
+            self.mode = "unit"
             return
+
 
         new_index = y * cols + x
         if new_index < len(party):
@@ -101,8 +117,11 @@ class PauseState:
 
         if self.mode == "menu":
             self._render_menu(screen)
-        else:
+        elif self.mode == "army":
             self._render_army(screen)
+        else:
+            self._render_unit(screen)
+
 
     def _render_menu(self, screen):
         w, h = screen.get_width(), screen.get_height()
@@ -179,4 +198,45 @@ class PauseState:
                 pygame.draw.rect(screen, (240, 220, 80), rect, 3)
 
         hint = self.small_font.render("W/A/S/D mover  ESC volver", True, (200, 200, 200))
+        screen.blit(hint, (24, h - 32))
+
+    def _render_unit(self, screen):
+        w, h = screen.get_width(), screen.get_height()
+        box = pygame.Rect(24, 24, w - 48, h - 80)
+
+        pygame.draw.rect(screen, (10, 10, 10), box)
+        pygame.draw.rect(screen, (255, 255, 255), box, 2)
+
+        title = self.font.render("FICHA", True, (255, 255, 255))
+        screen.blit(title, (box.x + 18, box.y + 14))
+
+        unit = self.selected_unit or {}
+        name = unit.get("name") or unit.get("id", "???")
+        unit_id = unit.get("id", "???")
+
+        level = unit.get("level", "-")
+        cls = unit.get("class", unit.get("job", "-"))
+
+        hp = unit.get("hp", "-")
+        atk = unit.get("atk", "-")
+        deff = unit.get("def", unit.get("defense", "-"))
+
+        lines = [
+            f"Nombre: {name}",
+            f"ID: {unit_id}",
+            f"Nivel: {level}",
+            f"Clase: {cls}",
+            "",
+            f"HP: {hp}",
+            f"ATK: {atk}",
+            f"DEF: {deff}",
+        ]
+
+        y = box.y + 70
+        for line in lines:
+            surf = self.font.render(line, True, (255, 255, 255))
+            screen.blit(surf, (box.x + 18, y))
+            y += 36 if line == "" else 30
+
+        hint = self.small_font.render("ESC volver", True, (200, 200, 200))
         screen.blit(hint, (24, h - 32))

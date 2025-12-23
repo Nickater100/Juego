@@ -201,44 +201,7 @@ class WorldState:
         self.dialogue_lines = []
         self.dialogue_index = 0
 
-    def confirm_dialogue_option(self):
-        if not self.dialogue_options:
-            self.close_dialogue()
-            return
-
-        opt = self.dialogue_options[self.dialogue_option_index]
-        action = opt.get("action", "close")
-
-        if action == "close":
-            self.close_dialogue()
-            return
-
-        if action == "recruit":
-            unit_id = opt.get("unit_id", "")
-            if not unit_id:
-                self.close_dialogue()
-                return
-
-            # Evitar reclutar 2 veces
-            already = any(m.get("id") == unit_id for m in self.game.game_state.party)
-            if already:
-                # Feedback mínimo: reemplaza líneas y deja solo "Salir"
-                self.dialogue_lines = ["Ya forma parte de tu ejército."]
-                self.dialogue_options = [{"text": "Salir", "action": "close"}]
-                self.dialogue_option_index = 0
-                return
-
-            # Agregar a la party
-            self.game.game_state.add_party_member(unit_id=unit_id, name=self.dialogue_speaker)
-
-            # Feedback mínimo
-            self.dialogue_lines = [f"{self.dialogue_speaker} se ha unido a tu ejército."]
-            self.dialogue_options = [{"text": "Salir", "action": "close"}]
-            self.dialogue_option_index = 0
-            return
-
-        # Acción desconocida -> cerrar por seguridad
-        self.close_dialogue()
+    # (Eliminada la versión duplicada de confirm_dialogue_option; queda solo la versión más completa al final del archivo)
 
 
     def _trim_transparent(self, surface: pygame.Surface) -> pygame.Surface:
@@ -401,7 +364,8 @@ class WorldState:
             # Agregar a la party
             self.game.game_state.add_party_member(
                 unit_id=unit_id,
-                name=self.dialogue_speaker
+                name=self.dialogue_speaker,
+                extra={"level": 1, "class": "soldier", "hp": 18, "atk": 5, "def": 3}
             )
             # Registrar reclutamiento como flag de historia
             self.game.game_state.set_flag(f"recruited:{unit_id}", True)
