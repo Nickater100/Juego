@@ -32,3 +32,28 @@ class GameState:
         if extra:
             payload.update(extra)
         self.party.append(payload)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "version": 1,
+            "current_map_id": self.current_map_id,
+            "player_tile": [self.player_tile[0], self.player_tile[1]],
+            "story_flags": dict(self.story_flags),
+            "party": list(self.party),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GameState":
+        gs = cls()
+        gs.current_map_id = data.get("current_map_id", "town_01")
+
+        pt = data.get("player_tile", [5, 5])
+        if isinstance(pt, (list, tuple)) and len(pt) == 2:
+            gs.player_tile = (int(pt[0]), int(pt[1]))
+        else:
+            gs.player_tile = (5, 5)
+
+        gs.story_flags = dict(data.get("story_flags", {}))
+        gs.party = list(data.get("party", []))
+        return gs
+

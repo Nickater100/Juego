@@ -13,6 +13,13 @@ class WorldState:
         self.game = game
 
         self.map = MapData()
+        filtered = []
+        for n in getattr(self.map, "npcs", []):
+            npc_id = n.get("id", "")
+            if npc_id and self.game.game_state.get_flag(f"recruited:{npc_id}", False):
+                continue
+            filtered.append(n)
+        self.map.npcs = filtered
         self.collision = CollisionSystem(self.map)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
 
@@ -116,17 +123,17 @@ class WorldState:
 
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
 
-        if not self.move_dir or self.player.is_moving:
-            return
+        # Repetición de movimiento por tecla mantenida
+        if self.move_dir and not self.player.is_moving:
+            self.move_timer += dt
+            if self.move_timer >= self.initial_delay:
+                self.controller.try_move(*self.move_dir)
+                self.move_timer = self.initial_delay - self.repeat_delay
+        else:
+            self.move_timer = 0
 
-        self.move_timer += dt
-
-        if self.move_timer >= self.initial_delay:
-            self.controller.try_move(*self.move_dir)
-            self.move_timer = self.initial_delay - self.repeat_delay
-
+        # ✅ Guardar SIEMPRE la última tile del jugador
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
-
 
 
     def render(self, screen):
