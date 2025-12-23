@@ -14,6 +14,20 @@ class MapData:
         self.width = len(self.grid[0])
         self.height = len(self.grid)
 
+        # NPCs del mapa (MVP)
+        self.npcs = [
+            {
+                "id": "advisor_01",
+                "name": "Consejero",
+                "tile_x": 7,
+                "tile_y": 5,
+                "dialogue": [
+                    "Mi príncipe... lamento lo de tu padre.",
+                    "La aldea te necesita. Habla con el capitán para reclutar soldados."
+                ],
+            }
+        ]
+
     def is_blocked(self, x, y):
         if x < 0 or y < 0:
             return True
