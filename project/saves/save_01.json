@@ -2,21 +2,9 @@
   "version": 1,
   "current_map_id": "town_01",
   "player_tile": [
-    8,
-    1
+    5,
+    3
   ],
-  "story_flags": {
-    "recruited:captain_01": true
-  },
-  "party": [
-    {
-      "id": "captain_01",
-      "name": "Capitán",
-      "level": 1,
-      "class": "soldier",
-      "hp": 18,
-      "atk": 5,
-      "def": 3
-    }
-  ]
+  "story_flags": {},
+  "party": []
 }
