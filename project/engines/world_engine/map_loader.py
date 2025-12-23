@@ -25,8 +25,23 @@ class MapData:
                     "Mi príncipe... lamento lo de tu padre.",
                     "La aldea te necesita. Habla con el capitán para reclutar soldados."
                 ],
+            },
+            {
+                "id": "captain_01",
+                "name": "Capitán",
+                "tile_x": 8,
+                "tile_y": 5,
+                "dialogue": [
+                    "A tus órdenes, mi príncipe.",
+                    "¿Deseas que me una a tu ejército?"
+                ],
+                "options": [
+                    {"text": "Reclutar", "action": "recruit", "unit_id": "captain_01"},
+                    {"text": "Salir", "action": "close"}
+                ],
             }
         ]
+
 
     def is_blocked(self, x, y):
         if x < 0 or y < 0:

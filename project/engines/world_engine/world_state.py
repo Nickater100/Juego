@@ -23,6 +23,9 @@ class WorldState:
 
         self.move_dir = None
         self.move_timer = 0
+        self.dialogue_options = []
+        self.dialogue_option_index = 0
+        self.dialogue_context = {}  # para saber con qué NPC/acción estamos
         self.initial_delay = 0.2
         self.repeat_delay = 0.12
         self.dialogue_active = False
@@ -45,12 +48,33 @@ class WorldState:
 
     def handle_event(self, event):
         # Si hay diálogo abierto, capturamos teclas para cerrarlo
+        # Si hay diálogo abierto, capturamos teclas para navegar opciones / cerrar
         if self.dialogue_active:
             if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE, pygame.K_RETURN, pygame.K_SPACE):
+                # Cerrar
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     self.close_dialogue()
-            return
+                    return
 
+                # Navegar opciones (si existen)
+                if self.dialogue_options:
+                    if event.key == pygame.K_w:
+                        self.dialogue_option_index = (self.dialogue_option_index - 1) % len(self.dialogue_options)
+                        return
+                    if event.key == pygame.K_s:
+                        self.dialogue_option_index = (self.dialogue_option_index + 1) % len(self.dialogue_options)
+                        return
+
+                    # Confirmar opción
+                    if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        self.confirm_dialogue_option()
+                        return
+                else:
+                    # Si no hay opciones, ENTER/SPACE también cierra (como antes)
+                    if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        self.close_dialogue()
+                        return
+                    
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_w:
                 self.move_dir = (0, -1)
@@ -145,14 +169,24 @@ class WorldState:
         if not npc:
             return
 
-        self.open_dialogue(npc.get("name", ""), npc.get("dialogue", []))
+        self.open_dialogue(
+            npc.get("name", ""),
+            npc.get("dialogue", []),
+            options=npc.get("options", []),
+            context={"npc_id": npc.get("id", ""), "npc": npc}
+        )
 
 
-    def open_dialogue(self, speaker: str, lines: list[str]):
+
+    def open_dialogue(self, speaker: str, lines: list[str], options=None, context=None):
         self.dialogue_active = True
         self.dialogue_speaker = speaker
         self.dialogue_lines = lines[:] if lines else ["..."]
         self.dialogue_index = 0
+
+        self.dialogue_options = options[:] if options else []
+        self.dialogue_option_index = 0
+        self.dialogue_context = context or {}
 
 
     def close_dialogue(self):
@@ -160,6 +194,46 @@ class WorldState:
         self.dialogue_speaker = ""
         self.dialogue_lines = []
         self.dialogue_index = 0
+
+    def confirm_dialogue_option(self):
+        if not self.dialogue_options:
+            self.close_dialogue()
+            return
+
+        opt = self.dialogue_options[self.dialogue_option_index]
+        action = opt.get("action", "close")
+
+        if action == "close":
+            self.close_dialogue()
+            return
+
+        if action == "recruit":
+            unit_id = opt.get("unit_id", "")
+            if not unit_id:
+                self.close_dialogue()
+                return
+
+            # Evitar reclutar 2 veces
+            already = any(m.get("id") == unit_id for m in self.game.game_state.party)
+            if already:
+                # Feedback mínimo: reemplaza líneas y deja solo "Salir"
+                self.dialogue_lines = ["Ya forma parte de tu ejército."]
+                self.dialogue_options = [{"text": "Salir", "action": "close"}]
+                self.dialogue_option_index = 0
+                return
+
+            # Agregar a la party
+            self.game.game_state.add_party_member(unit_id=unit_id, name=self.dialogue_speaker)
+
+            # Feedback mínimo
+            self.dialogue_lines = [f"{self.dialogue_speaker} se ha unido a tu ejército."]
+            self.dialogue_options = [{"text": "Salir", "action": "close"}]
+            self.dialogue_option_index = 0
+            return
+
+        # Acción desconocida -> cerrar por seguridad
+        self.close_dialogue()
+
 
     def _trim_transparent(self, surface: pygame.Surface) -> pygame.Surface:
         """Recorta bordes transparentes de una imagen (alpha trim)."""
@@ -203,33 +277,32 @@ class WorldState:
         )
 
         # -------------------------
-        # Retrato "cover" sin deformar
-        # Recorte ANCLADO ARRIBA (para que no corte la cara)
+        # Retrato: 'contain' (entra completo) + panel negro
         # -------------------------
         cache_key = (portrait_area.w, portrait_area.h)
         if getattr(self, "portrait_cover_key", None) != cache_key:
             ow, oh = self.portrait_original.get_width(), self.portrait_original.get_height()
 
-            # Escalado tipo 'contain': la imagen siempre entra completa en el área
             scale_needed = min(portrait_area.w / ow, portrait_area.h / oh)
             new_w = int(ow * scale_needed)
             new_h = int(oh * scale_needed)
+
             scaled = pygame.transform.smoothscale(self.portrait_original, (new_w, new_h))
 
-            # Panel negro de fondo
             panel = pygame.Surface((portrait_area.w, portrait_area.h), pygame.SRCALPHA)
             panel.fill((0, 0, 0, 255))
 
-            # Centramos la imagen escalada
             px = (portrait_area.w - new_w) // 2
             py = (portrait_area.h - new_h) // 2
             panel.blit(scaled, (px, py))
+
             self.portrait_cover = panel
+            self.portrait_cover_key = cache_key  # <-- IMPORTANTE
 
         screen.blit(self.portrait_cover, (portrait_area.x, portrait_area.y))
 
         # -------------------------
-        # Word-wrap para el texto dentro del área (nunca se sale)
+        # Word-wrap para el texto dentro del área
         # -------------------------
         def wrap_lines(text: str, font: pygame.font.Font, max_w: int):
             words = text.split(" ")
@@ -256,57 +329,39 @@ class WorldState:
             screen.blit(name_surf, (text_x, text_y))
             text_y += 22
 
+        # Texto principal
         all_text = " ".join(self.dialogue_lines) if self.dialogue_lines else "..."
         wrapped = wrap_lines(all_text, self.ui_font, text_area.width)
 
         line_h = 22
-        max_lines = max(1, (text_area.height - 24) // line_h)
-        for i, line in enumerate(wrapped[:max_lines]):
+
+        # Reservar espacio para opciones si existen
+        options_lines = len(self.dialogue_options) if getattr(self, "dialogue_options", []) else 0
+        options_space = options_lines * line_h + (10 if options_lines else 0)
+
+        max_text_lines = max(1, (text_area.height - options_space - 24) // line_h)
+        for i, line in enumerate(wrapped[:max_text_lines]):
             line_surf = self.ui_font.render(line, True, (255, 255, 255))
             screen.blit(line_surf, (text_x, text_y + i * line_h))
 
-        hint = self.ui_font.render("ENTER/SPACE/ESC: cerrar", True, (180, 180, 180))
-        screen.blit(hint, (box_rect.x + box_rect.w - 210, box_rect.y + box_rect.h - 28))
+        # -------------------------
+        # Opciones
+        # -------------------------
+        if getattr(self, "dialogue_options", []):
+            opt_y = text_y + min(len(wrapped), max_text_lines) * line_h + 10
+
+            for i, opt in enumerate(self.dialogue_options):
+                prefix = "▶ " if i == self.dialogue_option_index else "  "
+                opt_surf = self.ui_font.render(prefix + opt.get("text", ""), True, (255, 255, 255))
+                screen.blit(opt_surf, (text_area.x, opt_y + i * line_h))
+
+            hint_text = "W/S: elegir  ENTER: confirmar  ESC: cerrar"
+        else:
+            hint_text = "ENTER/SPACE/ESC: cerrar"
+
+        hint = self.ui_font.render(hint_text, True, (180, 180, 180))
+        screen.blit(hint, (box_rect.x + box_rect.w - 380, box_rect.y + box_rect.h - 28))
 
 
-        # --------
-        # Word-wrap del texto para que NUNCA se salga del cuadro
-        # --------
-        def wrap_lines(text: str, font: pygame.font.Font, max_w: int):
-            words = text.split(" ")
-            lines = []
-            current = ""
-            for word in words:
-                test = word if not current else current + " " + word
-                if font.size(test)[0] <= max_w:
-                    current = test
-                else:
-                    if current:
-                        lines.append(current)
-                    current = word
-            if current:
-                lines.append(current)
-            return lines
 
-        text_x = text_area.x
-        text_y = text_area.y
-
-        # Nombre hablante
-        if self.dialogue_speaker:
-            name_surf = self.ui_font.render(self.dialogue_speaker + ":", True, (255, 255, 255))
-            screen.blit(name_surf, (text_x, text_y))
-            text_y += 22
-
-        # Unimos todas las líneas en un solo texto y lo wrappeamos al ancho del área de texto
-        all_text = " ".join(self.dialogue_lines) if self.dialogue_lines else "..."
-        wrapped = wrap_lines(all_text, self.ui_font, text_area.width)
-
-        # Dibujar líneas (máximo según la altura disponible)
-        line_h = 22
-        max_lines = max(1, (text_area.height - 24) // line_h)
-        for i, line in enumerate(wrapped[:max_lines]):
-            line_surf = self.ui_font.render(line, True, (255, 255, 255))
-            screen.blit(line_surf, (text_x, text_y + i * line_h))
-
-        hint = self.ui_font.render("ENTER/SPACE/ESC: cerrar", True, (180, 180, 180))
-        screen.blit(hint, (box_rect.x + box_rect.w - 210, box_rect.y + box_rect.h - 28))
+        # ...el resto del método sigue igual, sin el bloque duplicado...
