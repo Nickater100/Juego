@@ -365,3 +365,48 @@ class WorldState:
 
 
         # ...el resto del método sigue igual, sin el bloque duplicado...
+
+    def confirm_dialogue_option(self):
+        # Si no hay opciones, cerrar diálogo
+        if not self.dialogue_options:
+            self.close_dialogue()
+            return
+
+        # Opción seleccionada
+        option = self.dialogue_options[self.dialogue_option_index]
+        action = option.get("action", "close")
+
+        # Acción: cerrar
+        if action == "close":
+            self.close_dialogue()
+            return
+
+        # Acción: reclutar
+        if action == "recruit":
+            unit_id = option.get("unit_id", "unknown")
+
+            # Evitar reclutar dos veces
+            if any(u.get("id") == unit_id for u in self.game.game_state.party):
+                self.dialogue_lines = ["Ya forma parte de tu ejército."]
+                self.dialogue_options = [{"text": "Salir", "action": "close"}]
+                self.dialogue_option_index = 0
+                return
+
+            # Agregar a la party
+            self.game.game_state.add_party_member(
+                unit_id=unit_id,
+                name=self.dialogue_speaker
+            )
+
+            npc_id = self.dialogue_context.get("npc_id")
+            if npc_id:
+                self.map.npcs = [n for n in getattr(self.map, "npcs", []) if n.get("id") != npc_id]
+
+            # Feedback
+            self.dialogue_lines = [f"{self.dialogue_speaker} se ha unido a tu ejército."]
+            self.dialogue_options = [{"text": "Salir", "action": "close"}]
+            self.dialogue_option_index = 0
+            return
+
+        # Acción desconocida → cerrar por seguridad
+        self.close_dialogue()
