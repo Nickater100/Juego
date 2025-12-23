@@ -1,6 +1,6 @@
 import pygame
 from core.game_state import GameState
-from engines.world_engine.world_state import WorldState
+from engines.world_engine.start_menu_state import StartMenuState
 
 
 class Game:
@@ -11,7 +11,9 @@ class Game:
         self.game_state = GameState()
 
         # Estado actual (arranca en mundo)
-        self.state = WorldState(self)
+        # Estado actual (arranca en menú)
+        self.state = StartMenuState(self)
+
 
     def change_state(self, new_state):
         self.state = new_state
