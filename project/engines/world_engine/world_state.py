@@ -88,6 +88,12 @@ class WorldState:
             elif event.key == pygame.K_d:
                 self.move_dir = (1, 0)
                 self.player.set_facing(1, 0)
+            # Abrir menú de pausa estilo Pokémon
+            if event.key in (pygame.K_RETURN, pygame.K_p):
+                from engines.world_engine.pause_state import PauseState
+                self.game.change_state(PauseState(self.game, self))
+                return
+
 
             # Interactuar
             elif event.key == pygame.K_e:
@@ -397,6 +403,8 @@ class WorldState:
                 unit_id=unit_id,
                 name=self.dialogue_speaker
             )
+            # Registrar reclutamiento como flag de historia
+            self.game.game_state.set_flag(f"recruited:{unit_id}", True)
 
             npc_id = self.dialogue_context.get("npc_id")
             if npc_id:
