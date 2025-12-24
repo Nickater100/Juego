@@ -364,21 +364,35 @@ class WorldState:
         tx = self.player.tile_x + dx
         ty = self.player.tile_y + dy
 
+        # 1. Buscar NPC
         npc = None
         for n in getattr(self.map, "npcs", []):
             if n.get("tile_x") == tx and n.get("tile_y") == ty:
                 npc = n
                 break
-
-        if not npc:
+        if npc:
+            self.open_dialogue(
+                npc.get("name", ""),
+                npc.get("dialogue", []),
+                options=npc.get("options", []),
+                context={"npc_id": npc.get("id", ""), "npc": npc}
+            )
             return
 
-        self.open_dialogue(
-            npc.get("name", ""),
-            npc.get("dialogue", []),
-            options=npc.get("options", []),
-            context={"npc_id": npc.get("id", ""), "npc": npc}
-        )
+        # 2. Buscar objeto interactuable enfrente
+        interactuables = self._get_objectgroup("interactuable")
+        px = tx * TILE_SIZE
+        py = ty * TILE_SIZE
+        player_rect = pygame.Rect(px, py, TILE_SIZE, TILE_SIZE)
+        for obj in interactuables:
+            obj_rect = pygame.Rect(obj["x"], obj["y"], obj["width"], obj["height"])
+            if player_rect.colliderect(obj_rect):
+                props = self._props_to_dict(obj)
+                dialogo = props.get("dialogo")
+                if dialogo:
+                    # Mostrar como diálogo del protagonista
+                    self.open_dialogue("", [dialogo])
+                return
 
     def open_dialogue(self, speaker: str, lines: list[str], options=None, context=None):
         self.dialogue_active = True
