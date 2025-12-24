@@ -285,21 +285,33 @@ class WorldState:
                             puerta_destino = d
                             break
 
-        # 2) Fallback: puerta opuesta (solo para elegir SPAWN, no el mapa)
+        # 2) Buscar puerta destino que apunte al mapa de origen (match por propiedad 'map')
         if tx is None or ty is None:
-            puerta_destino = puertas_destino[0]
-
+            puerta_destino = None
             if puerta_entrada:
-                eje = "x" if puerta_entrada["width"] >= puerta_entrada["height"] else "y"
-                map_mid_x = (self.map.width * TILE_SIZE) // 2
-                map_mid_y = (self.map.height * TILE_SIZE) // 2
-                px = self.player.pixel_x + TILE_SIZE // 2
-                py = self.player.pixel_y + TILE_SIZE // 2
+                # Path del mapa de origen (normalizado)
+                origen_path = self.map.json_path.replace("\\", "/").split("assets/")[-1]
+                # Buscar puerta cuyo 'map' apunte al origen
+                for pd in puertas_destino:
+                    props_pd = self._props_to_dict(pd)
+                    map_prop = props_pd.get("map", "").replace("\\", "/")
+                    if map_prop.endswith(origen_path):
+                        puerta_destino = pd
+                        break
 
-                if eje == "x":
-                    puerta_destino = max(puertas_destino, key=lambda o: o["x"]) if px < map_mid_x else min(puertas_destino, key=lambda o: o["x"])
-                else:
-                    puerta_destino = max(puertas_destino, key=lambda o: o["y"]) if py < map_mid_y else min(puertas_destino, key=lambda o: o["y"])
+            # Si no se encontró match exacto, usar lógica de opuesto como fallback
+            if puerta_destino is None:
+                puerta_destino = puertas_destino[0]
+                if puerta_entrada:
+                    eje = "x" if puerta_entrada["width"] >= puerta_entrada["height"] else "y"
+                    puerta_in_cx = puerta_entrada["x"] + puerta_entrada["width"] / 2
+                    puerta_in_cy = puerta_entrada["y"] + puerta_entrada["height"] / 2
+                    map_mid_x = (self.map.width * TILE_SIZE) / 2
+                    map_mid_y = (self.map.height * TILE_SIZE) / 2
+                    if eje == "x":
+                        puerta_destino = max(puertas_destino, key=lambda o: o["x"]) if puerta_in_cx < map_mid_x else min(puertas_destino, key=lambda o: o["x"])
+                    else:
+                        puerta_destino = max(puertas_destino, key=lambda o: o["y"]) if puerta_in_cy < map_mid_y else min(puertas_destino, key=lambda o: o["y"])
 
             tx = int((puerta_destino["x"] + puerta_destino["width"] / 2) // TILE_SIZE)
             ty = int((puerta_destino["y"] + puerta_destino["height"] / 2) // TILE_SIZE)
