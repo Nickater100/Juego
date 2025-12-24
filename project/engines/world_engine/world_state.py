@@ -1,3 +1,5 @@
+# project/engines/world_engine/world_state.py
+
 from engines.world_engine.map_loader import TiledMap
 from engines.world_engine.collision import CollisionSystem
 from engines.world_engine.npc_controller import MovementController
@@ -9,14 +11,38 @@ from core.config import SCREEN_WIDTH, SCREEN_HEIGHT
 from core.assets import asset_path
 import json
 
+
 class WorldState:
-    def __init__(self, game):
+    def __init__(self, game, map_rel_path=("maps", "world", "town_01.json"), spawn_tile=None):
         self.game = game
 
+        # ✅ ahora el mapa se decide desde afuera
+        # map_rel_path puede ser tuple/list ("maps","world","town_01.json") o string "maps/world/town_01.json"
+        if isinstance(map_rel_path, (tuple, list)):
+            json_path = asset_path(*map_rel_path)
+        else:
+            json_path = asset_path(map_rel_path)
+
         self.map = TiledMap(
-            json_path=asset_path("C:\\Users\\nicos\\OneDrive\\Escritorio\\Proyectos Nico\\Juego\\project\\assets\\maps\\world\\town_01.json"),
-            assets_root=asset_path("")  # root assets
+            json_path=json_path,
+            assets_root=asset_path("")  # root assets (si asset_path("") ya apunta a assets)
         )
+
+        # --- Cache JSON del mapa + objectgroups (puertas, triggers, etc) ---
+        self._map_json_cache = None
+        self._objectgroups_cache = {}
+
+        # cache de puertas del mapa actual (object layer "puertas")
+        self.doors = self._get_objectgroup("puertas")
+
+        # anti-loop puertas
+        self._door_was_inside = False
+        self._door_cooldown = 0.0  # segundos
+        # ✅ lock anti-rebote: al spawnear, bloquea puertas hasta salir
+        self._door_lock_until_exit = False
+        self._door_lock_rect = None
+
+
         filtered = []
         for n in getattr(self.map, "npcs", []):
             npc_id = n.get("id", "")
@@ -24,11 +50,17 @@ class WorldState:
                 continue
             filtered.append(n)
         self.map.npcs = filtered
+
         self.collision = CollisionSystem(self.map)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
 
+        # ✅ spawn: si viene explícito, usarlo; si no, usar lo guardado en game_state
+        if spawn_tile is not None:
+            px, py = spawn_tile
+            self.game.game_state.set_player_tile(px, py)
+        else:
+            px, py = self.game.game_state.get_player_tile()
 
-        px, py = self.game.game_state.get_player_tile()
         self.player = Unit(tile_x=px, tile_y=py)
         self.controller = MovementController(self.player, self.collision)
 
@@ -56,9 +88,7 @@ class WorldState:
         self.portrait_cover = None
         self.portrait_cover_key = None
 
-
     def handle_event(self, event):
-        # Si hay diálogo abierto, capturamos teclas para cerrarlo
         # Si hay diálogo abierto, capturamos teclas para navegar opciones / cerrar
         if self.dialogue_active:
             if event.type == pygame.KEYDOWN:
@@ -85,7 +115,7 @@ class WorldState:
                     if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                         self.close_dialogue()
                         return
-                    
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_w:
                 self.move_dir = (0, -1)
@@ -99,12 +129,12 @@ class WorldState:
             elif event.key == pygame.K_d:
                 self.move_dir = (1, 0)
                 self.player.set_facing(1, 0)
+
             # Abrir menú de pausa estilo Pokémon
             if event.key in (pygame.K_RETURN, pygame.K_p):
                 from engines.world_engine.pause_state import PauseState
                 self.game.change_state(PauseState(self.game, self))
                 return
-
 
             # Interactuar
             elif event.key == pygame.K_e:
@@ -120,7 +150,6 @@ class WorldState:
                 self.move_dir = None
                 self.move_timer = 0
 
-
     def update(self, dt):
         self.controller.update(dt)
         self.player.update_sprite(dt)
@@ -133,101 +162,169 @@ class WorldState:
         else:
             self.move_timer = 0
 
-        # Detectar si el jugador pisa cualquier parte de una puerta
-        for obj in self.map_json_layer_objects("puertas"):
-            # Área de la puerta en píxeles
-            x0 = obj["x"]
-            y0 = obj["y"]
-            x1 = x0 + obj["width"]
-            y1 = y0 + obj["height"]
-            # Centro del jugador en píxeles
-            px = self.player.tile_x * TILE_SIZE
-            py = self.player.tile_y * TILE_SIZE
-            # Si el jugador está dentro del área de la puerta
-            if x0 <= px < x1 and y0 <= py < y1:
-                # Buscar destino
-                for prop in obj.get("properties", []):
-                    if prop["name"] == "map":
-                        destino = prop["value"]
-                        self.cambiar_mapa(destino)
-                        return
+        # --- Cooldown puertas ---
+        if self._door_cooldown > 0:
+            self._door_cooldown -= dt
+            if self._door_cooldown < 0:
+                self._door_cooldown = 0
+
+        # Chequear puertas SOLO cuando el jugador no se está moviendo
+        # ✅ Anti-rebote: si recién spawneó en una puerta, no disparar hasta salir del rect
+        if self._door_lock_until_exit and self._door_lock_rect:
+            player_rect = pygame.Rect(self.player.pixel_x, self.player.pixel_y, TILE_SIZE, TILE_SIZE)
+            if player_rect.colliderect(self._door_lock_rect):
+                # sigue dentro, no evaluar puertas
+                self._door_was_inside = True
+                return
+            else:
+                # ya salió, liberar lock
+                self._door_lock_until_exit = False
+                self._door_lock_rect = None
+                self._door_was_inside = False
+
+        if not self.player.is_moving and self._door_cooldown == 0:
+            player_rect = pygame.Rect(
+                self.player.pixel_x,
+                self.player.pixel_y,
+                TILE_SIZE,
+                TILE_SIZE
+            )
+
+            inside_any = False
+            door_hit = None
+
+            # usar cache (self.doors)
+            for obj in self.doors:
+                door_rect = pygame.Rect(obj["x"], obj["y"], obj["width"], obj["height"])
+                if player_rect.colliderect(door_rect):
+                    inside_any = True
+                    door_hit = obj
+                    break
+
+            # Edge trigger: solo dispara cuando antes NO estaba dentro y ahora SÍ
+            if inside_any and not self._door_was_inside and door_hit:
+                props = self._props_to_dict(door_hit)
+
+                # soporta tu property "map" y el nuevo "target_map"
+                destino = props.get("map") or props.get("map")
+                if destino:
+                    self.cambiar_mapa(destino, puerta_entrada=door_hit)
+                    self._door_cooldown = 0.25  # 250ms anti-loop
+                    return
+
+            self._door_was_inside = inside_any
 
         # ✅ Guardar SIEMPRE la última tile del jugador
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
 
-    def map_json_layer_objects(self, layer_name):
-        # Devuelve la lista de objetos de una capa objectgroup por nombre
-        with open(self.map.json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    # -------------------------------
+    # JSON cache + objectgroups
+    # -------------------------------
+    def _load_map_json(self):
+        if self._map_json_cache is None:
+            with open(self.map.json_path, "r", encoding="utf-8") as f:
+                self._map_json_cache = json.load(f)
+        return self._map_json_cache
+
+    def _get_objectgroup(self, layer_name: str):
+        if layer_name in self._objectgroups_cache:
+            return self._objectgroups_cache[layer_name]
+
+        data = self._load_map_json()
         for layer in data.get("layers", []):
             if layer.get("type") == "objectgroup" and layer.get("name") == layer_name:
-                return layer.get("objects", [])
+                objs = layer.get("objects", [])
+                self._objectgroups_cache[layer_name] = objs
+                return objs
+
+        self._objectgroups_cache[layer_name] = []
         return []
 
-    def cambiar_mapa(self, destino):
-        # Teletransportar al personaje a la puerta opuesta en el mapa destino
-        from engines.world_engine.world_state import WorldState
-        import os
+    def _props_to_dict(self, obj) -> dict:
+        out = {}
+        for p in obj.get("properties", []) or []:
+            out[p.get("name")] = p.get("value")
+        return out
+
+    def cambiar_mapa(self, destino, puerta_entrada=None):
         destino_path = asset_path(destino)
-        # Leer puertas del mapa destino
+
         with open(destino_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        puertas = []
+
+        # Puertas del destino
+        puertas_destino = []
         for layer in data.get("layers", []):
             if layer.get("type") == "objectgroup" and layer.get("name") == "puertas":
-                puertas = layer.get("objects", [])
+                puertas_destino = layer.get("objects", [])
                 break
-        # Si no hay puertas, usar posición por defecto
-        if not puertas:
-            self.game.change_state(WorldState(self.game))
+
+        # Si no hay puertas en destino: igual cargamos destino y spawn en (0,0)
+        if not puertas_destino:
+            nuevo = WorldState(self.game, map_rel_path=destino, spawn_tile=(0, 0))
+            # lock básico (sin rect específico)
+            nuevo._door_cooldown = 0.4
+            self.game.change_state(nuevo)
             return
 
-        # Detectar eje de entrada (horizontal o vertical)
-        # Usar la puerta por la que entró (posición actual)
-        px = self.player.tile_x * TILE_SIZE
-        py = self.player.tile_y * TILE_SIZE
-        puerta_entrada = None
-        for obj in self.map_json_layer_objects("puertas"):
-            x0 = obj["x"]
-            y0 = obj["y"]
-            x1 = x0 + obj["width"]
-            y1 = y0 + obj["height"]
-            if x0 <= px < x1 and y0 <= py < y1:
-                puerta_entrada = obj
-                break
+        puerta_destino = None
+        tx = ty = None
 
-        # Si no se detecta, usar la puerta más cercana
+        # 1) Spawn explícito desde la puerta de entrada (recomendado)
         if puerta_entrada:
-            # Eje principal: horizontal si la puerta es más ancha que alta
-            eje = "x" if obj["width"] >= obj["height"] else "y"
-            # Buscar puerta opuesta en destino
-            if eje == "x":
-                # Si entró por la izquierda, buscar la puerta más a la derecha
-                if px < self.map.width * TILE_SIZE // 2:
-                    puerta_destino = max(puertas, key=lambda o: o["x"])
+            props_in = self._props_to_dict(puerta_entrada)
+            if "spawn_x" in props_in and "spawn_y" in props_in:
+                tx = int(props_in["spawn_x"])
+                ty = int(props_in["spawn_y"])
+
+                # Si además viene un "spawn_door_id", usamos esa puerta para lock (opcional)
+                spawn_door_id = props_in.get("spawn_door_id")
+                if spawn_door_id:
+                    for d in puertas_destino:
+                        if self._props_to_dict(d).get("id") == spawn_door_id:
+                            puerta_destino = d
+                            break
+
+        # 2) Fallback: puerta opuesta (solo para elegir SPAWN, no el mapa)
+        if tx is None or ty is None:
+            puerta_destino = puertas_destino[0]
+
+            if puerta_entrada:
+                eje = "x" if puerta_entrada["width"] >= puerta_entrada["height"] else "y"
+                map_mid_x = (self.map.width * TILE_SIZE) // 2
+                map_mid_y = (self.map.height * TILE_SIZE) // 2
+                px = self.player.pixel_x + TILE_SIZE // 2
+                py = self.player.pixel_y + TILE_SIZE // 2
+
+                if eje == "x":
+                    puerta_destino = max(puertas_destino, key=lambda o: o["x"]) if px < map_mid_x else min(puertas_destino, key=lambda o: o["x"])
                 else:
-                    puerta_destino = min(puertas, key=lambda o: o["x"])
-            else:
-                # Si entró por arriba, buscar la puerta más abajo
-                if py < self.map.height * TILE_SIZE // 2:
-                    puerta_destino = max(puertas, key=lambda o: o["y"])
-                else:
-                    puerta_destino = min(puertas, key=lambda o: o["y"])
+                    puerta_destino = max(puertas_destino, key=lambda o: o["y"]) if py < map_mid_y else min(puertas_destino, key=lambda o: o["y"])
+
+            tx = int((puerta_destino["x"] + puerta_destino["width"] / 2) // TILE_SIZE)
+            ty = int((puerta_destino["y"] + puerta_destino["height"] / 2) // TILE_SIZE)
+
+        # Crear estado nuevo en el mapa destino y spawnear
+        nuevo = WorldState(self.game, map_rel_path=destino, spawn_tile=(tx, ty))
+
+        # ✅ Anti-rebote:
+        # bloquear triggers hasta que el jugador SALGA del rect de la puerta destino
+        if puerta_destino is not None:
+            nuevo._door_lock_until_exit = True
+            nuevo._door_lock_rect = pygame.Rect(
+                puerta_destino["x"], puerta_destino["y"],
+                puerta_destino["width"], puerta_destino["height"]
+            )
+            # además, por seguridad, un cooldown corto
+            nuevo._door_cooldown = 0.15
+            nuevo._door_was_inside = True
         else:
-            # Si no se detecta, usar la puerta más alejada
-            puerta_destino = puertas[0]
+            # si no sabemos qué puerta fue, al menos un cooldown para evitar rebote
+            nuevo._door_cooldown = 0.4
+            nuevo._door_was_inside = True
 
-        # Calcular tile destino
-        tx = int(puerta_destino["x"] // TILE_SIZE)
-        ty = int(puerta_destino["y"] // TILE_SIZE)
+        self.game.change_state(nuevo)
 
-        # Cambiar de estado y setear posición
-        nuevo_estado = WorldState(self.game)
-        nuevo_estado.player.tile_x = tx
-        nuevo_estado.player.tile_y = ty
-        nuevo_estado.player.pixel_x = tx * TILE_SIZE
-        nuevo_estado.player.pixel_y = ty * TILE_SIZE
-        self.game.change_state(nuevo_estado)
 
 
     def render(self, screen):
@@ -248,8 +345,6 @@ class WorldState:
         # Diálogo
         if self.dialogue_active:
             self.render_dialogue(screen)
-
-
 
     def try_interact(self):
         # NPC enfrente del jugador
@@ -273,8 +368,6 @@ class WorldState:
             context={"npc_id": npc.get("id", ""), "npc": npc}
         )
 
-
-
     def open_dialogue(self, speaker: str, lines: list[str], options=None, context=None):
         self.dialogue_active = True
         self.dialogue_speaker = speaker
@@ -285,21 +378,16 @@ class WorldState:
         self.dialogue_option_index = 0
         self.dialogue_context = context or {}
 
-
     def close_dialogue(self):
         self.dialogue_active = False
         self.dialogue_speaker = ""
         self.dialogue_lines = []
         self.dialogue_index = 0
 
-    # (Eliminada la versión duplicada de confirm_dialogue_option; queda solo la versión más completa al final del archivo)
-
-
     def _trim_transparent(self, surface: pygame.Surface) -> pygame.Surface:
         """Recorta bordes transparentes de una imagen (alpha trim)."""
         rect = surface.get_bounding_rect()
         return surface.subsurface(rect).copy()
-
 
     def render_dialogue(self, screen):
         w, h = screen.get_width(), screen.get_height()
@@ -357,7 +445,7 @@ class WorldState:
             panel.blit(scaled, (px, py))
 
             self.portrait_cover = panel
-            self.portrait_cover_key = cache_key  # <-- IMPORTANTE
+            self.portrait_cover_key = cache_key
 
         screen.blit(self.portrait_cover, (portrait_area.x, portrait_area.y))
 
@@ -421,10 +509,6 @@ class WorldState:
 
         hint = self.ui_font.render(hint_text, True, (180, 180, 180))
         screen.blit(hint, (box_rect.x + box_rect.w - 380, box_rect.y + box_rect.h - 28))
-
-
-
-        # ...el resto del método sigue igual, sin el bloque duplicado...
 
     def confirm_dialogue_option(self):
         # Si no hay opciones, cerrar diálogo
