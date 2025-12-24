@@ -1,4 +1,4 @@
-from engines.world_engine.map_loader import MapData
+from engines.world_engine.map_loader import TiledMap
 from engines.world_engine.collision import CollisionSystem
 from engines.world_engine.npc_controller import MovementController
 from core.entities.unit import Unit
@@ -7,12 +7,16 @@ from core.config import TILE_SIZE
 from render.world.camera import Camera
 from core.config import SCREEN_WIDTH, SCREEN_HEIGHT
 from core.assets import asset_path
+import json
 
 class WorldState:
     def __init__(self, game):
         self.game = game
 
-        self.map = MapData()
+        self.map = TiledMap(
+            json_path=asset_path("C:\\Users\\nicos\\OneDrive\\Escritorio\\Proyectos Nico\\Juego\\project\\assets\\maps\\world\\town_01.json"),
+            assets_root=asset_path("")  # root assets
+        )
         filtered = []
         for n in getattr(self.map, "npcs", []):
             npc_id = n.get("id", "")
@@ -123,48 +127,128 @@ class WorldState:
 
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
 
-        # Repetición de movimiento por tecla mantenida
+        # Movimiento fluido: intenta mover cada frame si no está moviéndose
         if self.move_dir and not self.player.is_moving:
-            self.move_timer += dt
-            if self.move_timer >= self.initial_delay:
-                self.controller.try_move(*self.move_dir)
-                self.move_timer = self.initial_delay - self.repeat_delay
+            self.controller.try_move(*self.move_dir)
         else:
             self.move_timer = 0
 
+        # Detectar si el jugador pisa cualquier parte de una puerta
+        for obj in self.map_json_layer_objects("puertas"):
+            # Área de la puerta en píxeles
+            x0 = obj["x"]
+            y0 = obj["y"]
+            x1 = x0 + obj["width"]
+            y1 = y0 + obj["height"]
+            # Centro del jugador en píxeles
+            px = self.player.tile_x * TILE_SIZE
+            py = self.player.tile_y * TILE_SIZE
+            # Si el jugador está dentro del área de la puerta
+            if x0 <= px < x1 and y0 <= py < y1:
+                # Buscar destino
+                for prop in obj.get("properties", []):
+                    if prop["name"] == "map":
+                        destino = prop["value"]
+                        self.cambiar_mapa(destino)
+                        return
+
         # ✅ Guardar SIEMPRE la última tile del jugador
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
+
+    def map_json_layer_objects(self, layer_name):
+        # Devuelve la lista de objetos de una capa objectgroup por nombre
+        with open(self.map.json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for layer in data.get("layers", []):
+            if layer.get("type") == "objectgroup" and layer.get("name") == layer_name:
+                return layer.get("objects", [])
+        return []
+
+    def cambiar_mapa(self, destino):
+        # Teletransportar al personaje a la puerta opuesta en el mapa destino
+        from engines.world_engine.world_state import WorldState
+        import os
+        destino_path = asset_path(destino)
+        # Leer puertas del mapa destino
+        with open(destino_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        puertas = []
+        for layer in data.get("layers", []):
+            if layer.get("type") == "objectgroup" and layer.get("name") == "puertas":
+                puertas = layer.get("objects", [])
+                break
+        # Si no hay puertas, usar posición por defecto
+        if not puertas:
+            self.game.change_state(WorldState(self.game))
+            return
+
+        # Detectar eje de entrada (horizontal o vertical)
+        # Usar la puerta por la que entró (posición actual)
+        px = self.player.tile_x * TILE_SIZE
+        py = self.player.tile_y * TILE_SIZE
+        puerta_entrada = None
+        for obj in self.map_json_layer_objects("puertas"):
+            x0 = obj["x"]
+            y0 = obj["y"]
+            x1 = x0 + obj["width"]
+            y1 = y0 + obj["height"]
+            if x0 <= px < x1 and y0 <= py < y1:
+                puerta_entrada = obj
+                break
+
+        # Si no se detecta, usar la puerta más cercana
+        if puerta_entrada:
+            # Eje principal: horizontal si la puerta es más ancha que alta
+            eje = "x" if obj["width"] >= obj["height"] else "y"
+            # Buscar puerta opuesta en destino
+            if eje == "x":
+                # Si entró por la izquierda, buscar la puerta más a la derecha
+                if px < self.map.width * TILE_SIZE // 2:
+                    puerta_destino = max(puertas, key=lambda o: o["x"])
+                else:
+                    puerta_destino = min(puertas, key=lambda o: o["x"])
+            else:
+                # Si entró por arriba, buscar la puerta más abajo
+                if py < self.map.height * TILE_SIZE // 2:
+                    puerta_destino = max(puertas, key=lambda o: o["y"])
+                else:
+                    puerta_destino = min(puertas, key=lambda o: o["y"])
+        else:
+            # Si no se detecta, usar la puerta más alejada
+            puerta_destino = puertas[0]
+
+        # Calcular tile destino
+        tx = int(puerta_destino["x"] // TILE_SIZE)
+        ty = int(puerta_destino["y"] // TILE_SIZE)
+
+        # Cambiar de estado y setear posición
+        nuevo_estado = WorldState(self.game)
+        nuevo_estado.player.tile_x = tx
+        nuevo_estado.player.tile_y = ty
+        nuevo_estado.player.pixel_x = tx * TILE_SIZE
+        nuevo_estado.player.pixel_y = ty * TILE_SIZE
+        self.game.change_state(nuevo_estado)
 
 
     def render(self, screen):
         screen.fill((0, 0, 0))
 
-        # Dibujar mapa
-        for y, row in enumerate(self.map.grid):
-            for x, tile in enumerate(row):
-                color = (80, 80, 80) if tile == 1 else (40, 120, 40)
-                world_x = x * TILE_SIZE - self.camera.x
-                world_y = y * TILE_SIZE - self.camera.y
+        # Dibujar mapa (esto ya blitea los tiles)
+        self.map.draw(screen, self.camera, layer_order=("mapa",))
 
-                pygame.draw.rect(
-                    screen,
-                    color,
-                    (world_x, world_y, TILE_SIZE, TILE_SIZE)
-                )
-        # Dibujar protagonista (UNA vez)
+        # Dibujar protagonista
         self.player.draw(screen, self.camera)
 
-        # Dibujar NPCs (MVP: como cuadrados azules)
-        # Dibujar NPCs (MVP: cuadrados azules)
+        # NPCs MVP (cuadrados)
         for n in getattr(self.map, "npcs", []):
             nx = n["tile_x"] * TILE_SIZE - self.camera.x
             ny = n["tile_y"] * TILE_SIZE - self.camera.y
             pygame.draw.rect(screen, (60, 80, 220), (nx, ny, TILE_SIZE, TILE_SIZE))
 
-
-        # Dibujar caja de diálogo si está activa
+        # Diálogo
         if self.dialogue_active:
             self.render_dialogue(screen)
+
 
 
     def try_interact(self):
