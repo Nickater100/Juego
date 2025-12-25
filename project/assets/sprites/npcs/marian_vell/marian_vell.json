@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+
+  "id": "marian_vell",
+  "name": "Marian Vell",
+  "age": 46,
+
+  "visual": {
+    "portrait": "sprites/npcs/marian_vell/portrait.png",
+    "walk": "sprites/npcs/marian_vell/walk.png",
+    "hurt": "sprites/npcs/marian_vell/hurt.png",
+    "battle": "sprites/npcs/marian_vell/battle.png"
+    },
+
+  "origin": {
+    "home": "Aleria",
+    "background": "Antiguo escribano y mediador local que ascendió a la corte por su elocuencia y su habilidad para leer a las personas. Durante más de una década fue consejero directo del padre del actual lord."
+  },
+
+  "relationships": {
+    "to_father": "Sirvió como consejero durante doce años. En público se mostraba leal y respetuoso; en privado ofrecía soluciones duras pero eficaces. Conoce secretos del pueblo y de la administración.",
+    "to_player_initial": "Se presenta como un apoyo firme durante la transición. Observa atentamente al nuevo lord, evaluando su carácter, sus dudas y su capacidad para ejercer poder."
+  },
+
+  "public_profile": {
+    "first_impression": "Cortés, sereno y extremadamente educado. Habla con seguridad y evita mostrar emociones fuertes incluso ante la muerte del antiguo lord.",
+    "reputation": [
+      "‘Sabe decir exactamente lo que uno necesita escuchar.’",
+      "‘Nunca levanta la voz, pero siempre consigue algo.’",
+      "‘Conviene tenerlo cerca.’"
+    ],
+    "visible_competencies": [
+      "Oratoria",
+      "Negociación",
+      "Lectura social",
+      "Protocolo político",
+      "Gestión de conflictos"
+    ],
+    "visible_flaws": [
+      "Tiende a monopolizar conversaciones importantes",
+      "Responde con ironía cuando se lo contradice en público"
+    ]
+  },
+
+  "hidden_profile": {
+    "moral_axes": {
+      "compassion_cruelty": "cruelty",
+      "order_pragmatism": "pragmatism",
+      "loyalty_ambition": "ambition"
+    },
+    "temperament": {
+      "patience": "high",
+      "impulsiveness": "low",
+      "risk_appetite": "medium"
+    },
+    "core_drives": [
+      "Conservar y expandir su influencia",
+      "Controlar la información clave del reino",
+      "Evitar quedar subordinado a líderes que considera débiles"
+    ],
+    "fears": [
+      "Perder relevancia política",
+      "Ser humillado públicamente",
+      "Quedar expuesto como manipulador"
+    ]
+  },
+
+  "trust_state": {
+    "initial_feeling": 55,
+    "min": 0,
+    "max": 100,
+    "sensitivity": {
+      "public_humiliation": "very_high",
+      "loss_of_influence": "high",
+      "inefficient_mercy": "medium",
+      "rigid_formalism": "low"
+    }
+  },
+
+  "roles": {
+    "current": null,
+    "eligible": [
+      "soldier",
+      "advisor",
+      "administrator",
+      "merchant"
+    ],
+    "role_bias": {
+      "soldier": 0.2,
+      "advisor": 0.9,
+      "administrator": 0.7,
+      "merchant": 0.4
+    }
+  },
+
+  "role_reactions": {
+    "advisor": {
+      "public_line": "‘Haré todo lo que esté en mi alcance para facilitar su gobierno, mi lord.’",
+      "hidden_effects": [
+        "gains_influence",
+        "controls_information_flow"
+      ]
+    },
+    "administrator": {
+      "public_line": "‘El orden financiero es la base de cualquier reino estable.’",
+      "hidden_effects": [
+        "tightens_economy",
+        "enables_silent_corruption"
+      ]
+    },
+    "merchant": {
+      "public_line": "‘Una mente fría puede convertir cualquier intercambio en ventaja.’",
+      "hidden_effects": [
+        "price_manipulation",
+        "private_deals"
+      ]
+    },
+    "soldier": {
+      "public_line": "‘Si esa es su voluntad, cumpliré… aunque no sea mi lugar.’",
+      "hidden_effects": [
+        "latent_resentment",
+        "low_combat_commitment"
+      ]
+    },
+    "unassigned": {
+      "public_line": "‘Entiendo. En tiempos inciertos, la paciencia es una virtud.’",
+      "hidden_effects": [
+        "quiet_observation",
+        "long_term_scheme"
+      ]
+    }
+  },
+
+  "dialogue": {
+    "intro_event_id": "marian_intro_01",
+    "tone": "cortés, persuasivo, calculador",
+    "behavioral_tells": [
+      "Elogia antes de sugerir decisiones",
+      "Apela a la urgencia usando la muerte del padre",
+      "Reformula órdenes para presentarlas como propias"
+    ],
+    "hooks": [
+      "Insinúa amenazas externas sin pruebas concretas",
+      "Menciona deudas y secretos del pueblo",
+      "Sugiere que otros NPCs no son confiables"
+    ]
+  },
+
+  "betrayal": {
+    "can_betray": true,
+    "warning_signs": [
+      "Empieza a hablar en nombre del lord",
+      "Reduce la información que comparte",
+      "Se vuelve excesivamente complaciente tras ser cuestionado"
+    ],
+    "possible_outcomes": [
+      {
+        "type": "political_coup",
+        "description": "Orquesta un escándalo interno o un bloqueo administrativo para debilitar al lord."
+      },
+      {
+        "type": "assassination_attempt",
+        "description": "Si se siente acorralado y sin influencia, puede intentar asesinar al jugador, iniciando un combate crítico."
+      }
+    ]
+  },
+
+  "combat_profile": {
+  "recruitable": true,
+  "base_stats": {
+    "level": 1,
+    "hp": 18,
+    "str": 4,
+    "def": 5,
+    "dex": 7,
+    "spd": 6,
+    "res": 8,
+    "cha": 10
+  },
+  "combat_notes": "No es un combatiente directo. Su valor en batalla radica en su influencia sobre aliados y enemigos."
+}
+
+}

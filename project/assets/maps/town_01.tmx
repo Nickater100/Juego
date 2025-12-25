@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="25" height="19" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="37">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="25" height="19" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="45">
  <editorsettings>
   <export target="world/town_01.json" format="json"/>
  </editorsettings>
@@ -47,6 +47,56 @@
    <properties>
     <property name="map" value="maps/world/beach_home.json"/>
    </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="markers">
+  <object id="37" x="367.432" y="373.085">
+   <properties>
+    <property name="id" value="spawn_player_start"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="38" x="301.483" y="463.53">
+   <properties>
+    <property name="id" value="line_1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="39" x="371.201" y="462.588">
+   <properties>
+    <property name="id" value="line_2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="40" x="430.555" y="465.414">
+   <properties>
+    <property name="id" value="line_3"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="41" x="493.678" y="463.53">
+   <properties>
+    <property name="id" value="line_4"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="42" x="424.903" y="395.696">
+   <properties>
+    <property name="id" value="spawn_marian_intro"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="43" x="369.317" y="335.4">
+   <properties>
+    <property name="id" value="enter_house"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="44" x="786.682" y="434.324">
+   <properties>
+    <property name="id" value="exit_right"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
  <objectgroup color="#aa0000" id="2" name="colission" tintcolor="#aa0000">

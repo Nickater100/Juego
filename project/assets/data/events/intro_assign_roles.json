@@ -1,0 +1,101 @@
+{
+  "id": "intro_assign_roles",
+  "once_flag": "intro_done",
+  "steps": [
+    {
+      "type": "dialogue",
+      "speaker": "Marian Vell",
+      "lines": [
+        "Mi lord… temo que las noticias no admiten rodeos.",
+        "Su padre ha muerto.",
+        "Desde este instante, el peso del pueblo recae sobre usted.",
+        "Y lo primero que un gobernante necesita no es una espada… sino orden.",
+        "Hoy mismo debe asignar un rol a cada uno de sus súbditos.",
+        "Necesitamos dos soldados para proteger el perímetro y acompañarlo cuando sea necesario.",
+        "También un consejero… alguien que lo guíe mientras usted se adapta.",
+        "Naturalmente, recomendaría elegir a alguien con experiencia.",
+        "Como yo.",
+        "Pero la decisión es suya.",
+        "Ahí los tiene. Han venido por respeto… y por miedo.",
+        "Mírelos bien. Lo que elija hoy definirá su primer paso… y su primer error."
+      ]
+    },
+    {
+      "type": "dialogue",
+      "speaker": "Selma Ironrose",
+      "lines": [
+        "Bueno… ¿vamos a hacer esto rápido o quiere que traiga una silla?"
+      ]
+    },
+    {
+      "type": "dialogue",
+      "speaker": "Loren Valcrest",
+      "lines": [
+        "Solo diga mi nombre y ya tenemos a uno de los soldados resuelto."
+      ]
+    },
+    {
+      "type": "dialogue",
+      "speaker": "Iraen Falk",
+      "lines": [
+        "Cumpliré lo que disponga, mi lord. Solo… hágalo con firmeza."
+      ]
+    },
+    {
+      "type": "dialogue",
+      "speaker": "Elinya Brightwell",
+      "lines": [
+        "Estoy acá. Pase lo que pase… no está solo."
+      ]
+    },
+
+    {
+      "type": "assign_roles",
+      "npcs": [
+        "marian_vell",
+        "selma_ironrose",
+        "loren_valcrest",
+        "iraen_falk",
+        "elinya_brightwell"
+      ],
+      "roles": [
+        "soldier",
+        "advisor",
+        "weapon_shop",
+        "inn"
+      ],
+      "constraints": {
+        "soldier": 2,
+        "advisor": 1,
+        "weapon_shop": 1,
+        "inn": 1
+      }
+    },
+
+    {
+      "type": "apply_role_spawns",
+      "map": "maps/world/town_01.json",
+      "role_to_marker": {
+        "advisor": "spawn_advisor",
+        "weapon_shop": "spawn_weapon_shop",
+        "inn": "spawn_inn",
+        "soldier_1": "spawn_soldier_1",
+        "soldier_2": "spawn_soldier_2"
+      }
+    },
+    {
+        "type": "post_assign_actions",
+        "actions": {
+            "advisor": { "move_to_marker": "enter_house", "despawn": true },
+            "weapon_shop": { "move_to_marker": "exit_right", "despawn": true },
+            "inn": { "move_to_marker": "exit_right", "despawn": true },
+            "soldier": { "join_party": true }
+        }
+    },
+    {
+      "type": "set_flag",
+      "flag": "intro_done",
+      "value": true
+    }
+  ]
+}

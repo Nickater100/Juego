@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+
+  "id": "iraen_falk",
+  "name": "Iraen Falk",
+  "age": 22,
+
+  "visual": {
+    "portrait": "sprites/npcs/iraen_falk/portrait.png",
+    "walk": "sprites/npcs/iraen_falk/walk.png",
+    "hurt": "sprites/npcs/iraen_falk/hurt.png",
+    "battle": "sprites/npcs/iraen_falk/battle.png"
+    },
+
+  "origin": {
+    "home": "Aleria",
+    "background": "Hijo de una familia antigua del pueblo. Creció escuchando historias sobre el linaje del lord y el deber hacia la tierra. No es un líder nato ni un guerrero excepcional, pero cree firmemente que el orden se sostiene respetando lo que siempre funcionó."
+  },
+
+  "relationships": {
+    "to_father": "Veía al antiguo lord como una figura legítima y necesaria. No lo idealizaba, pero confiaba en que mantenía el equilibrio.",
+    "to_player_initial": "Quiere creer en vos. Te observa con atención, buscando señales de continuidad más que de grandeza."
+  },
+
+  "public_profile": {
+    "first_impression": "Reservado, educado, algo rígido. Habla con cuidado y evita el sarcasmo.",
+    "reputation": [
+      "‘Buen chico, pero muy serio para su edad.’",
+      "‘Siempre hace las cosas como se deben.’",
+      "‘No le gustan las sorpresas.’"
+    ],
+    "visible_competencies": [
+      "Organización básica",
+      "Disciplina personal",
+      "Respeto de normas no escritas",
+      "Trato correcto con aldeanos"
+    ],
+    "visible_flaws": [
+      "Rigidez mental",
+      "Dificultad para improvisar",
+      "Incomodidad ante cambios repentinos"
+    ]
+  },
+
+  "hidden_profile": {
+    "moral_axes": {
+      "tradition_progress": "tradition",
+      "order_pragmatism": "order",
+      "faith_skepticism": "faith"
+    },
+    "temperament": {
+      "patience": "medium",
+      "impulsiveness": "low",
+      "risk_appetite": "low"
+    },
+    "core_drives": [
+      "Preservar la identidad del pueblo",
+      "Demostrar que la continuidad es estabilidad",
+      "Evitar que el caos se disfrace de progreso"
+    ],
+    "fears": [
+      "Que el nuevo lord rompa el equilibrio heredado",
+      "Que las decisiones rápidas dañen al pueblo",
+      "Quedar irrelevante en un mundo cambiante"
+    ]
+  },
+
+  "trust_state": {
+    "initial_feeling": 64,
+    "min": 0,
+    "max": 100,
+    "sensitivity": {
+      "public_humiliation": "medium",
+      "loss_of_influence": "low",
+      "inefficient_mercy": "low",
+      "ritual_disrespect": "high"
+    }
+  },
+
+  "roles": {
+    "current": null,
+    "eligible": [
+      "advisor",
+      "merchant",
+      "soldier",
+      "administrator"
+    ],
+    "role_bias": {
+      "advisor": 0.7,
+      "merchant": 0.6,
+      "soldier": 0.45,
+      "administrator": 0.5
+    }
+  },
+
+  "role_reactions": {
+    "advisor": {
+      "public_line": "‘Tal vez no sepa todo, mi lord, pero sé cómo se han hecho siempre las cosas.’",
+      "hidden_effects": [
+        "stabilizes_decisions",
+        "resists_reforms"
+      ]
+    },
+    "merchant": {
+      "public_line": "‘La gente confía cuando los precios no cambian sin razón.’",
+      "hidden_effects": [
+        "predictable_pricing",
+        "low_profit_variance"
+      ]
+    },
+    "soldier": {
+      "public_line": "‘No soy un héroe, pero cumpliré mi deber.’",
+      "hidden_effects": [
+        "disciplined_behavior",
+        "low_initiative"
+      ]
+    },
+    "administrator": {
+      "public_line": "‘El orden evita errores innecesarios.’",
+      "hidden_effects": [
+        "procedural_stability",
+        "slow_response"
+      ]
+    },
+    "unassigned": {
+      "public_line": "‘Observaré cómo guía al pueblo.’",
+      "hidden_effects": [
+        "silent_judgment",
+        "tradition_watch"
+      ]
+    }
+  },
+
+  "dialogue": {
+    "intro_event_id": "iraen_intro_01",
+    "tone": "respetuoso, sobrio, conservador",
+    "behavioral_tells": [
+      "Cita costumbres locales",
+      "Se incomoda con decisiones improvisadas",
+      "Habla de ‘cómo se hacía antes’"
+    ],
+    "hooks": [
+      "Reacciona mal a reformas bruscas",
+      "Puede frenar conflictos internos si se respeta el orden",
+      "Sirve de termómetro para la tradición popular"
+    ]
+  },
+
+  "betrayal": {
+    "can_betray": false,
+    "notes": "Iraen no traiciona activamente. Si pierde la fe en el liderazgo, se retira y deja de sostener el orden, lo que genera inestabilidad pasiva."
+  },
+
+  "combat_profile": {
+    "recruitable": true,
+    "combat_attitude": "disciplined",
+    "base_stats": {
+      "level": 1,
+      "hp": 21,
+      "str": 6,
+      "def": 6,
+      "dex": 5,
+      "spd": 5,
+      "res": 5,
+      "cha": 6
+    },
+    "combat_notes": "Soldado correcto y confiable, sin brillo. No comete errores graves, pero tampoco cambia el curso de la batalla."
+  }
+}

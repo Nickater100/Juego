@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+
+  "id": "selma_ironrose",
+  "name": "Selma Ironrose",
+  "age": 52,
+
+  "visual": {
+    "portrait": "sprites/npcs/selma_ironrose/portrait.png",
+    "walk": "sprites/npcs/selma_ironrose/walk.png",
+    "hurt": "sprites/npcs/selma_ironrose/hurt.png",
+    "battle": "sprites/npcs/selma_ironrose/battle.png"
+    },
+
+  "origin": {
+    "home": "Aleria",
+    "background": "Durante años fue una soldado de campaña al servicio de un pequeño señorío vecino. Tras una guerra que la dejó hastiada de banderas y juramentos, se retiró al pueblo y abrió un puesto de ventas. Conoce armas, rutas comerciales y, sobre todo, cómo huele un conflicto antes de que estalle."
+  },
+
+  "relationships": {
+    "to_father": "Respetaba al antiguo lord, aunque nunca fue de reverencias. Le vendía suministros al castillo y alguna vez le salvó una escolta con consejo práctico.",
+    "to_player_initial": "Te mide como a todos: con una ceja levantada y una frase filosa. Pero si ve que tu intención es proteger al pueblo, se vuelve un pilar silencioso."
+  },
+
+  "public_profile": {
+    "first_impression": "Sarcasmo fácil, sonrisa ladeada. Parece que todo le da igual… hasta que alguien amenaza al pueblo.",
+    "reputation": [
+      "‘Te vende una cuerda y te insulta por no saber atarla.’",
+      "‘Sabe de armas más que cualquiera.’",
+      "‘Cuando habla en serio, conviene escuchar.’"
+    ],
+    "visible_competencies": [
+      "Comercio y regateo",
+      "Conocimiento de armas y equipo",
+      "Lectura de riesgo (instinto de veterana)",
+      "Entrenamiento básico de milicia"
+    ],
+    "visible_flaws": [
+      "Sarcasmo que puede irritar a figuras de poder",
+      "Desconfía de discursos vacíos y promesas grandilocuentes"
+    ]
+  },
+
+  "hidden_profile": {
+    "moral_axes": {
+      "altruism_greed": "altruism",
+      "honor_utilitarianism": "honor",
+      "loyalty_ambition": "loyalty"
+    },
+    "temperament": {
+      "patience": "medium",
+      "impulsiveness": "medium",
+      "risk_appetite": "low"
+    },
+    "core_drives": [
+      "Proteger al pueblo de guerras ajenas",
+      "Evitar que jóvenes mueran por orgullo",
+      "Mantener la dignidad del reino sin volverse monstruos"
+    ],
+    "fears": [
+      "Volver a ver el pueblo convertido en campo de batalla",
+      "Que el nuevo lord repita errores de líderes anteriores",
+      "Que la necesidad obligue a traicionar sus principios"
+    ]
+  },
+
+  "trust_state": {
+    "initial_feeling": 62,
+    "min": 0,
+    "max": 100,
+    "sensitivity": {
+      "public_humiliation": "low",
+      "loss_of_influence": "low",
+      "inefficient_mercy": "low",
+      "rigid_formalism": "medium"
+    }
+  },
+
+  "roles": {
+    "current": null,
+    "eligible": [
+      "soldier",
+      "merchant",
+      "advisor",
+      "administrator"
+    ],
+    "role_bias": {
+      "soldier": 0.85,
+      "merchant": 0.75,
+      "advisor": 0.55,
+      "administrator": 0.35
+    }
+  },
+
+  "role_reactions": {
+    "merchant": {
+      "public_line": "‘¿Quiere que venda? Bien. Pero si me regatea como a un turista, lo saco a patadas.’",
+      "hidden_effects": [
+        "fair_prices",
+        "better_equipment_access"
+      ]
+    },
+    "soldier": {
+      "public_line": "‘Creí que ya había colgado la espada. Pero si esto va en serio… enséñeme dónde firmo.’",
+      "hidden_effects": [
+        "high_combat_commitment",
+        "protects_allies"
+      ]
+    },
+    "advisor": {
+      "public_line": "‘Le voy a hablar claro, mi lord. Si busca aplausos, vaya al teatro.’",
+      "hidden_effects": [
+        "honest_advice",
+        "reduces_overconfidence"
+      ]
+    },
+    "administrator": {
+      "public_line": "‘Puedo contar monedas, sí. Pero prefiero contar gente viva.’",
+      "hidden_effects": [
+        "stable_supplies",
+        "slow_but_reliable"
+      ]
+    },
+    "unassigned": {
+      "public_line": "‘No pasa nada. Yo sigo acá… mirando quién se cree muy importante.’",
+      "hidden_effects": [
+        "observes_threats",
+        "quiet_support"
+      ]
+    }
+  },
+
+  "dialogue": {
+    "intro_event_id": "selma_intro_01",
+    "tone": "sarcasmo con calidez escondida",
+    "behavioral_tells": [
+      "Bromea para bajar tensión",
+      "Se pone seria cuando se habla de civiles o jóvenes",
+      "Evita hablar del pasado militar salvo en confianza"
+    ],
+    "hooks": [
+      "Reconoce insignias o tácticas enemigas de guerras pasadas",
+      "Puede entrenar a reclutas si se le asigna ese rol",
+      "Detecta mercaderes estafadores antes que otros NPCs"
+    ]
+  },
+
+  "betrayal": {
+    "can_betray": false,
+    "notes": "Selma es leal por convicción, no por conveniencia. Su conflicto no es traicionar, sino retirarse o enfrentarte verbalmente si cruzás líneas morales."
+  },
+
+  "combat_profile": {
+    "recruitable": true,
+    "combat_attitude": "steadfast",
+    "base_stats": {
+      "level": 1,
+      "hp": 22,
+      "str": 7,
+      "def": 7,
+      "dex": 6,
+      "spd": 5,
+      "res": 4,
+      "cha": 7
+    },
+    "combat_notes": "Veterana sólida: aguanta, protege y no se desmorona. No destaca por velocidad ni magia, pero sostiene la línea y cuida a aliados."
+  }
+}

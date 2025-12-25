@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+
+  "id": "elinya_brightwell",
+  "name": "Elinya Brightwell",
+  "age": 19,
+
+  "visual": {
+    "portrait": "sprites/npcs/elinya_brightwell/portrait.png",
+    "world_sprite": "sprites/npcs/villagers/female_01.png"
+  },
+
+  "origin": {
+    "home": "Aleria",
+    "background": "Hija de posaderos. Creció escuchando historias de viajeros, soldados cansados y comerciantes rotos por el camino. Aprendió pronto que una sonrisa, una comida caliente y una palabra amable pueden sostener a alguien cuando nada más lo hace."
+  },
+
+  "relationships": {
+    "to_father": "Respetaba profundamente al antiguo lord. Lo veía como alguien firme pero justo, y creía que el pueblo estaba a salvo bajo su cuidado.",
+    "to_player_initial": "Quiere creer en vos desde el primer momento. Te habla con calidez genuina y parece asumir que vas a hacer lo correcto."
+  },
+
+  "public_profile": {
+    "first_impression": "Alegre, expresiva y sincera. Habla rápido, sonríe mucho y parece iluminar el ambiente.",
+    "reputation": [
+      "‘Siempre sabe cómo animarte.’",
+      "‘Hace que este lugar se sienta como casa.’",
+      "‘Te escucha de verdad.’"
+    ],
+    "visible_competencies": [
+      "Atención y cuidado de personas",
+      "Organización de la posada",
+      "Gestión básica de suministros",
+      "Apoyo emocional"
+    ],
+    "visible_flaws": [
+      "Tiende a confiar demasiado rápido",
+      "Se afecta emocionalmente por el sufrimiento ajeno",
+      "Le cuesta aceptar decisiones crueles"
+    ]
+  },
+
+  "hidden_profile": {
+    "moral_axes": {
+      "altruism_greed": "altruism",
+      "compassion_cruelty": "compassion",
+      "faith_skepticism": "faith"
+    },
+    "temperament": {
+      "patience": "medium",
+      "impulsiveness": "medium",
+      "risk_appetite": "low"
+    },
+    "core_drives": [
+      "Cuidar a los demás",
+      "Mantener la esperanza incluso en tiempos difíciles",
+      "Creer que las personas pueden elegir bien"
+    ],
+    "fears": [
+      "Que el pueblo pierda su humanidad",
+      "Que el nuevo lord se vuelva cruel",
+      "Que la bondad no sea suficiente"
+    ]
+  },
+
+  "trust_state": {
+    "initial_feeling": 72,
+    "min": 0,
+    "max": 100,
+    "sensitivity": {
+      "public_humiliation": "high",
+      "loss_of_influence": "low",
+      "inefficient_mercy": "very_low",
+      "cruelty_towards_civilians": "very_high"
+    }
+  },
+
+  "roles": {
+    "current": null,
+    "eligible": [
+      "merchant",
+      "soldier",
+      "advisor",
+      "administrator"
+    ],
+    "role_bias": {
+      "merchant": 0.9,
+      "advisor": 0.6,
+      "soldier": 0.4,
+      "administrator": 0.3
+    }
+  },
+
+  "role_reactions": {
+    "merchant": {
+      "public_line": "‘¡Haré todo lo posible para que la gente se sienta bienvenida!’",
+      "hidden_effects": [
+        "healing_bonus",
+        "morale_boost"
+      ]
+    },
+    "soldier": {
+      "public_line": "‘Si puedo ayudar a proteger a los demás… lo intentaré.’",
+      "hidden_effects": [
+        "emotional_strain",
+        "protective_instinct"
+      ]
+    },
+    "advisor": {
+      "public_line": "‘No sé mucho de política, pero sé cómo se siente la gente.’",
+      "hidden_effects": [
+        "empathy_based_decisions",
+        "softens_hard_choices"
+      ]
+    },
+    "administrator": {
+      "public_line": "‘Puedo intentarlo… si eso ayuda a que nadie quede atrás.’",
+      "hidden_effects": [
+        "inefficient_but_humane",
+        "prevents_neglect"
+      ]
+    },
+    "unassigned": {
+      "public_line": "‘Estaré acá, por si alguien me necesita.’",
+      "hidden_effects": [
+        "passive_morale_support",
+        "community_trust"
+      ]
+    }
+  },
+
+  "dialogue": {
+    "intro_event_id": "elinya_intro_01",
+    "tone": "cálido, optimista, sincero",
+    "behavioral_tells": [
+      "Recuerda nombres y detalles personales",
+      "Se preocupa por cómo afectan las decisiones a la gente común",
+      "Sonríe incluso cuando está preocupada"
+    ],
+    "hooks": [
+      "Reacciona fuertemente ante castigos injustos",
+      "Puede organizar apoyo comunitario",
+      "Sirve como termómetro emocional del pueblo"
+    ]
+  },
+
+  "betrayal": {
+    "can_betray": false,
+    "notes": "Elinya no traiciona. Si pierde la fe en el liderazgo, se rompe emocionalmente, lo que puede generar eventos trágicos o pérdida severa de moral en el pueblo."
+  },
+
+  "combat_profile": {
+    "recruitable": true,
+    "combat_attitude": "protective",
+    "base_stats": {
+      "level": 1,
+      "hp": 20,
+      "str": 4,
+      "def": 5,
+      "dex": 6,
+      "spd": 6,
+      "res": 7,
+      "cha": 9
+    },
+    "combat_notes": "Unidad de apoyo. No destaca en daño, pero protege, cura y mantiene la moral. Su sufrimiento en combate tiene consecuencias narrativas."
+  }
+}

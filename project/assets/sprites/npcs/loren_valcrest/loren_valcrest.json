@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+
+  "id": "loren_valcrest",
+  "name": "Loren Valcrest",
+  "age": 24,
+
+  "visual": {
+    "portrait": "sprites/npcs/loren_valcrest/portrait.png",
+    "walk": "sprites/npcs/loren_valcrest/walk.png",
+    "hurt": "sprites/npcs/loren_valcrest/hurt.png",
+    "battle": "sprites/npcs/loren_valcrest/battle.png"
+    },
+
+  "origin": {
+    "home": "Aleria",
+    "background": "Hijo de un veterano de guerra menor, Loren se alistó joven y destacó rápidamente por su velocidad y presencia. Sin embargo, nunca pasó de misiones menores debido a su falta de disciplina y su tendencia a subestimar el peligro. Regresó al pueblo con fama… y pocas cicatrices."
+  },
+
+  "relationships": {
+    "to_father": "Admiraba al antiguo lord más por su figura heroica que por su gobierno. Le gustaba contar que había servido ‘bajo su estandarte’, aunque su rol real fue limitado.",
+    "to_player_initial": "Te observa con curiosidad y expectativa. Espera reconocimiento rápido y gestos de liderazgo visibles. Quiere ser visto."
+  },
+
+  "public_profile": {
+    "first_impression": "Sonrisa segura, postura orgullosa. Habla de sí mismo con entusiasmo y de los demás con ligereza.",
+    "reputation": [
+      "‘Corre más rápido de lo que piensa.’",
+      "‘Siempre está listo… aunque no siempre preparado.’",
+      "‘Es imposible no notarlo.’"
+    ],
+    "visible_competencies": [
+      "Velocidad y movilidad",
+      "Combate ligero",
+      "Exploración y mensajería",
+      "Elevada presencia en grupo"
+    ],
+    "visible_flaws": [
+      "Vanidad evidente",
+      "Falta de atención a detalles",
+      "Tiende a exagerar logros"
+    ]
+  },
+
+  "hidden_profile": {
+    "moral_axes": {
+      "honor_utilitarianism": "honor",
+      "loyalty_ambition": "ambition",
+      "faith_skepticism": "skepticism"
+    },
+    "temperament": {
+      "patience": "low",
+      "impulsiveness": "high",
+      "risk_appetite": "high"
+    },
+    "core_drives": [
+      "Ser reconocido como héroe",
+      "Demostrar que es indispensable",
+      "Destacar por encima de otros soldados"
+    ],
+    "fears": [
+      "Pasar desapercibido",
+      "Ser considerado inútil",
+      "Quedar expuesto como incompetente"
+    ]
+  },
+
+  "trust_state": {
+    "initial_feeling": 58,
+    "min": 0,
+    "max": 100,
+    "sensitivity": {
+      "public_humiliation": "high",
+      "loss_of_influence": "medium",
+      "inefficient_mercy": "low",
+      "rigid_formalism": "low"
+    }
+  },
+
+  "roles": {
+    "current": null,
+    "eligible": [
+      "soldier",
+      "advisor",
+      "merchant",
+      "administrator"
+    ],
+    "role_bias": {
+      "soldier": 0.9,
+      "advisor": 0.25,
+      "merchant": 0.4,
+      "administrator": 0.15
+    }
+  },
+
+  "role_reactions": {
+    "soldier": {
+      "public_line": "‘¡Por fin alguien que reconoce el talento cuando lo ve!’",
+      "hidden_effects": [
+        "high_mobility",
+        "reckless_engagements"
+      ]
+    },
+    "advisor": {
+      "public_line": "‘Eh… claro, puedo opinar. Aunque no es lo mío hablar tanto.’",
+      "hidden_effects": [
+        "poor_planning",
+        "ego_fragility"
+      ]
+    },
+    "merchant": {
+      "public_line": "‘¿Vender? Bueno, mientras me vean hacerlo.’",
+      "hidden_effects": [
+        "flashy_sales",
+        "inconsistent_prices"
+      ]
+    },
+    "administrator": {
+      "public_line": "‘¿Papeles? Sí, sí… después.’",
+      "hidden_effects": [
+        "missed_deadlines",
+        "organizational_chaos"
+      ]
+    },
+    "unassigned": {
+      "public_line": "‘Supongo que ya va a notar lo que valgo.’",
+      "hidden_effects": [
+        "attention_seeking",
+        "low_self_control"
+      ]
+    }
+  },
+
+  "dialogue": {
+    "intro_event_id": "loren_intro_01",
+    "tone": "seguro, fanfarrón, ligeramente torpe",
+    "behavioral_tells": [
+      "Se adelanta a hablar antes de pensar",
+      "Sonríe incluso en situaciones tensas",
+      "Se desarma ante críticas directas"
+    ],
+    "hooks": [
+      "Busca misiones visibles y peligrosas",
+      "Puede generar problemas diplomáticos por imprudencia",
+      "Puede convertirse en un héroe… o en un desastre"
+    ]
+  },
+
+  "betrayal": {
+    "can_betray": true,
+    "warning_signs": [
+      "Empieza a actuar sin órdenes",
+      "Busca protagonismo incluso cuando no conviene",
+      "Se vuelve defensivo ante correcciones"
+    ],
+    "possible_outcomes": [
+      {
+        "type": "battle_mishap",
+        "description": "Una acción imprudente provoca bajas innecesarias o pone en riesgo la misión."
+      },
+      {
+        "type": "defection",
+        "description": "Si se siente humillado repetidamente, puede desertar buscando gloria en otro bando."
+      }
+    ]
+  },
+
+  "combat_profile": {
+    "recruitable": true,
+    "combat_attitude": "reckless",
+    "base_stats": {
+      "level": 1,
+      "hp": 20,
+      "str": 6,
+      "def": 4,
+      "dex": 7,
+      "spd": 9,
+      "res": 3,
+      "cha": 8
+    },
+    "combat_notes": "Unidad extremadamente veloz y carismática, pero frágil y propensa a errores. Brilla en escaramuzas rápidas; falla estrepitosamente si se la exige disciplina."
+  }
+}
