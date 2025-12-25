@@ -19,13 +19,12 @@ class StartMenuState:
             {"id": "new", "text": "Nueva partida", "enabled": True},
             {
                 "id": "load",
-                "text": "Cargar partida" if self.has_save else "Cargar partida",
+                "text": "Cargar partida",
                 "enabled": self.has_save,
             },
             {"id": "exit", "text": "Salir", "enabled": True},
         ]
 
-        # Si por algún motivo la primera opción estuviera deshabilitada, avanzamos
         self.option_index = 0
         if not self.options[self.option_index]["enabled"]:
             self.move_selection(1)
@@ -59,31 +58,44 @@ class StartMenuState:
             return
 
         if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            # No confirmar si está deshabilitada
             if not self.options[self.option_index]["enabled"]:
                 return
 
             chosen_id = self.options[self.option_index]["id"]
 
+            # -----------------------------
+            # NUEVA PARTIDA (RESET TOTAL)
+            # -----------------------------
             if chosen_id == "new":
+                # Reset duro del GameState
                 self.game.game_state = GameState()
+
+                # Seguridad: flags iniciales explícitos
+                self.game.game_state.set_flag("intro_done", False)
+
                 from engines.world_engine.world_state import WorldState
                 self.game.change_state(WorldState(self.game))
                 return
 
+            # -----------------------------
+            # CARGAR PARTIDA
+            # -----------------------------
             if chosen_id == "load":
                 loaded = load_game(slot=1)
                 if loaded is None:
-                    # Por las dudas (si borraron el save mientras está el menú abierto)
-                    self.message = "No hay partida guardada en slot 1 (save_01.json)."
+                    self.message = "No hay partida guardada en slot 1."
                     self.message_timer = 2.0
                     return
 
                 self.game.game_state = loaded
+
                 from engines.world_engine.world_state import WorldState
                 self.game.change_state(WorldState(self.game))
                 return
 
+            # -----------------------------
+            # SALIR
+            # -----------------------------
             if chosen_id == "exit":
                 pygame.quit()
                 sys.exit(0)

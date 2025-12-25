@@ -50,7 +50,7 @@
   </object>
  </objectgroup>
  <objectgroup id="5" name="markers">
-  <object id="37" x="367.432" y="373.085">
+  <object id="37" x="367.432" y="396.639">
    <properties>
     <property name="id" value="spawn_player_start"/>
    </properties>
@@ -86,7 +86,7 @@
    </properties>
    <point/>
   </object>
-  <object id="43" x="369.317" y="335.4">
+  <object id="43" x="369.317" y="350.474">
    <properties>
     <property name="id" value="enter_house"/>
    </properties>

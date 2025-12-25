@@ -4,10 +4,10 @@
 
 Este proyecto es un **RPG 2D narrativo y táctico**, con exploración top-down y combate por turnos estilo *Fire Emblem*, centrado en **decisiones de gobierno**, **gestión de NPCs** y **consecuencias humanas ocultas**.
 
-El jugador encarna a un **lord heredero** que recibe un pequeño pueblo independiente.  
-A partir de ese momento, deberá **gobernar, reclutar, administrar recursos, tomar decisiones morales ambiguas y enfrentar guerras**, tanto externas como internas.
+El jugador encarna a un **lord heredero** que recibe un pequeño pueblo independiente tras la muerte de su padre.  
+Desde el primer momento deberá **asignar roles**, **reclutar soldados**, **administrar recursos**, **interpretar personas** y **enfrentar conflictos internos y externos**.
 
-El foco del juego NO está en el grind ni en la optimización numérica, sino en:
+El foco del juego **NO** está en el grind ni en la optimización matemática, sino en:
 
 > **Tomar decisiones con información incompleta y vivir sus consecuencias narrativas, económicas y militares.**
 
@@ -15,65 +15,84 @@ El foco del juego NO está en el grind ni en la optimización numérica, sino en
 
 ## 🎯 Pilares de diseño
 
-- **Decisiones > Mecánicas**
-- **Información incompleta**
-- **NPCs como personas, no como stats**
-- **Consecuencias emergentes**
-- **Moralidad oculta, nunca explícita**
-- **El mapa como narrativa**
+- Decisiones > Mecánicas
+- Información incompleta
+- NPCs como personas, no como stats
+- Consecuencias emergentes
+- Moralidad oculta (nunca explícita)
+- El mapa como narrativa
+- Persistencia: lo que ocurre, permanece
 
 ---
 
 ## 🗺️ Mundo y exploración
 
-- El mundo está compuesto por **mapas diseñados a mano** en **Tiled**.
-- Cada mapa:
-  - tiene colisiones por capa
-  - puertas que conectan mapas
-  - capas de objetos para NPCs, eventos y triggers
-- El jugador explora en vista **top-down**, con movimiento por tiles.
+- Exploración **top-down** con movimiento por tiles.
+- Mundo compuesto por **mapas diseñados a mano en Tiled (JSON)**.
+- Cada mapa puede contener:
+  - capas de tiles (`ground`, `objects`, `collision`)
+  - puertas entre mapas
+  - object layers para:
+    - `markers` (spawns, puntos narrativos)
+    - `triggers` (eventos)
+    - `puertas`
+    - `interactuable`
 
 ### Herramientas
-- **Tiled (JSON)** para mapas
-- Engine propio en **Python + Pygame**
-- Sin RPG Maker (decisión consciente)
+- **Tiled (export JSON)**
+- **Python + Pygame**
+- Engine propio (decisión consciente, sin RPG Maker)
 
 ---
 
-## 🚪 Puertas y mapas
+## 🚪 Puertas y transiciones
 
 Las puertas:
-- están definidas en Tiled como **object layers**
-- usan propiedades para indicar:
-  - mapa destino
-  - spawn
-- incluyen sistema **anti-rebote** (lock hasta salir del área)
+- se definen como `objectgroup` en Tiled
+- usan propiedades (`map`, `spawn_x`, `spawn_y`, etc.)
+- incluyen sistema **anti-rebote**
+- bloquean reentrada hasta salir del área
 
-Esto permite:
-- diseño data-driven
-- cero hardcode de transiciones
-- mapas reutilizables
+Las transiciones son:
+- **data-driven**
+- reutilizables
+- sin lógica hardcodeada por mapa
 
 ---
 
 ## 🧍‍♂️ NPCs (núcleo del juego)
 
-Los NPCs son **entidades persistentes** con identidad y memoria.
+Los NPCs son **entidades persistentes**, con identidad propia y memoria.
 
-Cada NPC puede:
+Un NPC puede:
+- vivir en el mundo
 - ser reclutado como soldado
-- ser asignado a un rol civil (mercader, herrero, consejero)
-- abandonar, traicionar o manipular al jugador
+- ser asignado a un rol civil
+- abandonar el mapa
+- traicionar al jugador
 - morir permanentemente
 
 ### Importante
 - **Tiled NO dibuja NPCs**
 - Tiled solo define:
-  - posición
-  - id
-  - tipo
-  - referencias a diálogos o roles
-- El engine se encarga del render y la lógica
+  - marcadores de spawn
+  - triggers
+  - zonas narrativas
+- El engine instancia NPCs dinámicamente según el `GameState`
+
+---
+
+## 🎭 Representación visual de NPCs
+
+Cada NPC tiene sprites **por contexto**, no por rol:
+
+- `portrait` → retrato en diálogos
+- `walk` → exploración
+- `hurt` → estado herido
+- `battle` → animaciones de combate
+
+⚠️ **La apariencia NO cambia según rol o moralidad**  
+Esto evita metajuego visual y refuerza la ambigüedad narrativa.
 
 ---
 
@@ -83,7 +102,7 @@ El juego utiliza **7 ejes morales fundamentales**, definidos en JSON y compartid
 
 📄 `assets/data/morality_axes.json`
 
-Ejemplos de ejes:
+Ejemplos:
 - Altruismo ↔ Avaricia
 - Lealtad ↔ Ambición
 - Compasión ↔ Crueldad
@@ -93,14 +112,14 @@ Ejemplos de ejes:
 - Fe ↔ Escepticismo
 
 ### Principios clave
-- El jugador **NUNCA ve números**
-- No existen “buenas” o “malas” decisiones
-- Las moralidades **no disparan acciones directas**
-- Las consecuencias emergen por acumulación de tensiones
+- El jugador **nunca ve números**
+- No existen decisiones “buenas” o “malas”
+- Los ejes no disparan acciones directas
+- Las consecuencias emergen por acumulación
 
-Ejemplo:
-- un mercader avaricioso puede subir precios
-- un soldado ambicioso puede traicionar en batalla
+Ejemplos:
+- un mercader avaricioso sube precios
+- un soldado ambicioso traiciona en batalla
 - un consejero cruel puede intentar asesinar al jugador
 
 ---
@@ -112,62 +131,88 @@ El pueblo es un **sistema vivo**, no un hub estático.
 El jugador puede:
 - asignar NPCs a trabajos
 - elegir consejeros
-- invertir dinero en edificios
-- mejorar infraestructura
-- decidir políticas (impuestos, castigos, reformas)
+- invertir dinero
+- construir o mejorar edificios
+- tomar decisiones políticas (impuestos, castigos, reformas)
 
 Cada decisión:
 - afecta la economía
 - afecta NPCs específicos
-- genera consecuencias a corto y largo plazo
+- puede generar eventos narrativos
+- puede escalar a conflictos mayores
+
+---
+
+## 🎬 Escena inicial: La Herencia
+
+El juego comienza en el mapa `town_01`.
+
+- El jugador aparece frente a su casa.
+- Marian Vell (antiguo consejero del padre) está a su lado.
+- Los otros 4 NPCs iniciales están **formados en fila**, esperando.
+
+Marian informa:
+- la muerte del padre
+- la necesidad inmediata de gobernar
+- la primera tarea: **asignar roles**
+
+### Restricciones iniciales
+- 2 soldados → se unen a la party
+- 1 consejero
+- 1 encargado de la tienda de armas
+- 1 encargado de la posada
+
+Al confirmar:
+- consejero entra a la casa y desaparece del mapa
+- encargados de tiendas caminan hacia la salida derecha y desaparecen
+- soldados se unen al jugador
+
+Los destinos finales existen conceptualmente, pero **los mapas interiores aún no están creados**.
 
 ---
 
 ## ⚔️ Combate (Fire Emblem-like)
 
-El combate:
-- es **táctico, por turnos**
-- ocurre en mapas separados
-- utiliza unidades reclutadas (NPCs conocidos)
+- Combate táctico por turnos
+- Mapas separados del overworld
+- Unidades reclutadas = NPCs conocidos
+- Muerte permanente
+- Traición posible durante el combate
 
-Características:
-- muerte permanente
-- traición posible en medio de la batalla
-- decisiones previas influyen directamente en el combate
-
-Ejemplo:
-- un soldado con baja lealtad puede cambiar de bando
-- un consejero puede provocar una batalla mortal interna
-- perder ciertas batallas implica **game over narrativo**
+Las decisiones previas afectan directamente:
+- lealtad
+- comportamiento en batalla
+- eventos de traición o sacrificio
 
 ---
 
 ## 🌍 Reinos enemigos y expansión
 
 - El mundo reacciona al crecimiento del jugador
-- Aparecen reinos enemigos
+- Surgen reinos enemigos
 - La expansión no es solo militar:
-  - administrar territorios
-  - manejar conflictos internos
-  - sostener legitimidad
+  - administración
+  - legitimidad
+  - conflictos internos
 
 ---
 
 ## 🏗️ Progresión del reino
 
-- El jugador puede construir o mejorar:
-  - tiendas
-  - forjas
-  - defensas
-  - edificios civiles
-- Cada edificio:
-  - desbloquea nuevas decisiones
-  - introduce nuevos conflictos
-  - requiere NPCs adecuados para funcionar bien
+El jugador puede:
+- construir edificios
+- mejorar infraestructura
+- desbloquear sistemas narrativos
+- introducir nuevos conflictos
+
+Cada edificio:
+- requiere NPCs adecuados
+- puede fallar si se gestiona mal
+- tiene consecuencias narrativas
 
 ---
 
-## 🧩 Arquitectura técnica (resumen)
+## 🧩 Arquitectura técnica
 
 ### Lenguaje
 - Python
@@ -181,23 +226,25 @@ Ejemplo:
 - `BattleState` → combate táctico
 - `PauseState`, etc.
 
-### Filosofía
-- Data-driven
-- Estados desacoplados
-- JSON para diseño, código para lógica
+### Persistencia
+- `GameState` guarda:
+  - flags de historia
+  - party
+  - estado de NPCs (rol, activo/offmap)
+- Soporta guardado/carga
 
 ---
 
-## 📁 Estructura del proyecto (simplificada)
+## 📁 Estructura del proyecto
 
 project/
 ├─ assets/
-│ ├─ maps/ # Mapas Tiled (JSON)
-│ ├─ sprites/ # Sprites y retratos
+│ ├─ maps/
+│ ├─ sprites/
 │ └─ data/
 │ ├─ morality_axes.json
-│ ├─ dialogues/
 │ ├─ events/
+│ ├─ dialogues/
 │ └─ buildings.json
 │
 ├─ engines/
@@ -208,7 +255,7 @@ project/
 │
 ├─ core/
 │ ├─ entities/
-│ ├─ game_state.py # Flags, party, progreso
+│ ├─ game_state.py
 │ └─ config.py
 │
 └─ main.py
@@ -216,14 +263,28 @@ project/
 
 ---
 
+## 📌 Estado actual del desarrollo
+
+- ✔️ Engine base funcional
+- ✔️ Mapas con Tiled
+- ✔️ Puertas estables
+- ✔️ Sistema de diálogo
+- ✔️ Sistema de NPC persistente
+- ✔️ Escena inicial diseñada e implementada parcialmente
+- ✔️ Movimiento y despawn narrativo de NPCs
+- ⚠️ Event runner JSON (en progreso)
+- ⚠️ UI de asignación de roles (pendiente)
+
+---
+
 ## 🧠 Filosofía final
 
-Este proyecto busca que el jugador **no juegue a optimizar sistemas**, sino a **interpretar personas**.
+Este juego busca que el jugador **interprete personas**, no sistemas.
 
 Si el jugador puede:
-- predecir perfectamente las consecuencias
-- maximizar números visibles
-- evitar dilemas reales
+- predecir siempre el resultado
+- optimizar sin riesgo
+- evitar dilemas humanos
 
 entonces el diseño falló.
 
@@ -231,29 +292,13 @@ La ambigüedad es **intencional**.
 
 ---
 
-## 📌 Estado actual del desarrollo
-
-- ✔️ Engine base funcional
-- ✔️ Mapas con Tiled
-- ✔️ Puertas y transiciones estables
-- ✔️ Sistema de diálogo
-- ✔️ Flags de historia
-- ✔️ Diseño completo del sistema de moralidad
-
-### Próximos hitos recomendados
-1. Integrar NPCs data-driven desde Tiled
-2. Asociar NPCs a ejes morales
-3. Implementar primeras decisiones políticas
-4. Combat MVP táctico
-5. Primer arco narrativo completo
-
----
-
 ## ✍️ Nota para futuras sesiones
 
 Este README define:
-- **qué es el juego**
-- **qué no es**
-- **por qué está diseñado así**
+- la visión del juego
+- las reglas de diseño
+- el estado técnico actual
 
-Cualquier cambio debe respetar estos pilares, o redefinirlos explícitamente.
+Cualquier cambio debe:
+- respetar estos pilares
+- o redefinirlos explícitamente

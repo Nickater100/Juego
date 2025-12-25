@@ -7,8 +7,10 @@
 
   "visual": {
     "portrait": "sprites/npcs/elinya_brightwell/portrait.png",
-    "world_sprite": "sprites/npcs/villagers/female_01.png"
-  },
+    "walk": "sprites/npcs/elinya_brightwell/walk.png",
+    "hurt": "sprites/npcs/elinya_brightwell/hurt.png",
+    "battle": "sprites/npcs/elinya_brightwell/battle.png"
+    },
 
   "origin": {
     "home": "Aleria",

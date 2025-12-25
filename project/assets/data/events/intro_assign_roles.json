@@ -5,6 +5,8 @@
     {
       "type": "dialogue",
       "speaker": "Marian Vell",
+      "npc_id": "marian_vell",
+      "trigger": "auto",
       "lines": [
         "Mi lord… temo que las noticias no admiten rodeos.",
         "Su padre ha muerto.",
@@ -22,7 +24,18 @@
     },
     {
       "type": "dialogue",
+      "speaker": "Marian Vell",
+      "npc_id": "marian_vell",
+      "trigger": "talk",
+      "lines": [
+        "¿Está listo para decidir el destino de su gente, mi lord?"
+      ]
+    },
+    {
+      "type": "dialogue",
       "speaker": "Selma Ironrose",
+      "npc_id": "selma_ironrose",
+      "trigger": "talk",
       "lines": [
         "Bueno… ¿vamos a hacer esto rápido o quiere que traiga una silla?"
       ]
@@ -30,6 +43,8 @@
     {
       "type": "dialogue",
       "speaker": "Loren Valcrest",
+        "npc_id": "loren_valcrest",
+        "trigger": "talk",
       "lines": [
         "Solo diga mi nombre y ya tenemos a uno de los soldados resuelto."
       ]
@@ -37,6 +52,8 @@
     {
       "type": "dialogue",
       "speaker": "Iraen Falk",
+        "npc_id": "iraen_falk",
+        "trigger": "talk",
       "lines": [
         "Cumpliré lo que disponga, mi lord. Solo… hágalo con firmeza."
       ]
@@ -44,6 +61,8 @@
     {
       "type": "dialogue",
       "speaker": "Elinya Brightwell",
+        "npc_id": "elinya_brightwell",
+        "trigger": "talk",
       "lines": [
         "Estoy acá. Pase lo que pase… no está solo."
       ]
@@ -83,15 +102,26 @@
         "soldier_2": "spawn_soldier_2"
       }
     },
+
     {
-        "type": "post_assign_actions",
-        "actions": {
-            "advisor": { "move_to_marker": "enter_house", "despawn": true },
-            "weapon_shop": { "move_to_marker": "exit_right", "despawn": true },
-            "inn": { "move_to_marker": "exit_right", "despawn": true },
-            "soldier": { "join_party": true }
+    "type": "apply_role_outcomes",
+    "roles": {
+        "soldier": {
+        "effects": [{ "type": "join_party" }]
+        },
+        "weapon_shop": {
+        "move_to_marker": "exit_right"
+        },
+        "inn": {
+        "move_to_marker": "exit_right"
+        },
+        "advisor": {
+        "move_to_marker": "enter_house"
         }
+    }
     },
+
+
     {
       "type": "set_flag",
       "flag": "intro_done",
