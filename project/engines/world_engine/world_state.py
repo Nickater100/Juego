@@ -451,6 +451,11 @@ class WorldState:
     def close_dialogue(self):
         # Ejecutar callback post-diálogo si existe
         after = self.dialogue_context.get("after_dialogue") if self.dialogue_context else None
+        # Si estamos en asignación de roles y el usuario cierra con ESC, avanzar igual para evitar cuelgues
+        if self.dialogue_context and self.dialogue_context.get("event") == "assign_roles" and getattr(self, "_assign_active", False):
+            self._assign_idx += 1
+            self._show_assign_prompt()
+            return
         self.dialogue_active = False
         self.dialogue_speaker = ""
         self.dialogue_lines = []

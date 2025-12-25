@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "current_map_id": "town_01",
+  "player_tile": [
+    11,
+    12
+  ],
+  "story_flags": {
+    "intro_done": false
+  },
+  "party": [],
+  "npcs": {}
+}
