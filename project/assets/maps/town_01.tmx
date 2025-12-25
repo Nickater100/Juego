@@ -56,25 +56,25 @@
    </properties>
    <point/>
   </object>
-  <object id="38" x="301.483" y="463.53">
+  <object id="38" x="301.483" y="433.382">
    <properties>
     <property name="id" value="line_1"/>
    </properties>
    <point/>
   </object>
-  <object id="39" x="371.201" y="462.588">
+  <object id="39" x="368.375" y="435.266">
    <properties>
     <property name="id" value="line_2"/>
    </properties>
    <point/>
   </object>
-  <object id="40" x="430.555" y="465.414">
+  <object id="40" x="431.498" y="437.15">
    <properties>
     <property name="id" value="line_3"/>
    </properties>
    <point/>
   </object>
-  <object id="41" x="493.678" y="463.53">
+  <object id="41" x="492.736" y="436.208">
    <properties>
     <property name="id" value="line_4"/>
    </properties>

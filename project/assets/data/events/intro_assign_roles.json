@@ -104,22 +104,25 @@
     },
 
     {
-    "type": "apply_role_outcomes",
-    "roles": {
-        "soldier": {
-        "effects": [{ "type": "join_party" }]
-        },
-        "weapon_shop": {
-        "move_to_marker": "exit_right"
-        },
-        "inn": {
-        "move_to_marker": "exit_right"
-        },
-        "advisor": {
-        "move_to_marker": "enter_house"
-        }
-    }
+  "type": "apply_role_outcomes",
+  "roles": {
+    "soldier": {
+      "effects": [{ "type": "join_party" }]
     },
+    "weapon_shop": {
+      "move_to_marker": "exit_right",
+      "despawn_on_arrival": true
+    },
+    "inn": {
+      "move_to_marker": "exit_right",
+      "despawn_on_arrival": true
+    },
+    "advisor": {
+      "move_to_marker": "enter_house",
+      "despawn_on_arrival": true
+    }
+  }
+},
 
 
     {

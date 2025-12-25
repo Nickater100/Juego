@@ -1119,7 +1119,8 @@ class WorldState:
             if not target:
                 print(f"[LOG] marker_id '{marker_id}' no existe en self.markers")
             else:
-                self.npc_tasks[npc_id] = {"type": "walk_to", "target": target, "despawn": False}
+                despawn = bool(cfg.get("despawn_on_arrival", False))
+                self.npc_tasks[npc_id] = {"type": "walk_to", "target": target, "despawn": despawn}
 
         # 2) efectos (lista)
         effects = cfg.get("effects", []) or []
