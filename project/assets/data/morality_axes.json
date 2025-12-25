@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "axes": {
+    "altruism_greed": {
+      "name": "Altruismo ↔ Avaricia",
+      "left": {
+        "id": "altruism",
+        "label": "Altruismo",
+        "description": "Prioriza el bienestar colectivo incluso a costa de beneficios personales o del corto plazo."
+      },
+      "right": {
+        "id": "greed",
+        "label": "Avaricia",
+        "description": "Busca maximizar beneficios personales y detesta el desperdicio de oportunidades económicas."
+      },
+      "tensions": [
+        "tax_policy",
+        "wages_and_pay",
+        "public_aid",
+        "resource_distribution",
+        "trade_and_prices",
+        "post_battle_loot",
+        "corruption_tolerance"
+      ],
+      "manifestations": {
+        "low": [
+          "Hace comentarios sutiles sobre justicia o aprovechamiento.",
+          "Cuestiona decisiones económicas en privado."
+        ],
+        "medium": [
+          "Empieza a negociar condiciones o a manipular precios/recursos.",
+          "Sugiere alternativas interesadas o moralizantes según su inclinación."
+        ],
+        "high": [
+          "Abusa de su posición económica (sube precios, retiene recursos) o denuncia públicamente injusticias.",
+          "Toma acciones por cuenta propia que dañan la estabilidad si no se lo escucha."
+        ]
+      }
+    },
+
+    "loyalty_ambition": {
+      "name": "Lealtad ↔ Ambición",
+      "left": {
+        "id": "loyalty",
+        "label": "Lealtad",
+        "description": "Valora la estabilidad, la jerarquía y el deber; busca sostener al lord y al pueblo."
+      },
+      "right": {
+        "id": "ambition",
+        "label": "Ambición",
+        "description": "Busca ascenso, control y reconocimiento; se resiente si se siente subestimado o desplazado."
+      },
+      "tensions": [
+        "appointments",
+        "delegation_of_power",
+        "military_rank",
+        "credit_and_recognition",
+        "favoritism",
+        "succession_and_titles"
+      ],
+      "manifestations": {
+        "low": [
+          "Acepta órdenes difíciles sin quejarse o pide responsabilidades mayores con tacto.",
+          "Muestra orgullo (lealtad) o hambre de protagonismo (ambición) en pequeños gestos."
+        ],
+        "medium": [
+          "Empieza a presionar por cargos/tierras o a cuestionar liderazgo.",
+          "Puede saltarse la cadena de mando o formar alianzas internas."
+        ],
+        "high": [
+          "Conspira, sabotea o traiciona en momentos críticos.",
+          "Intenta reemplazar al lord o capturar poder de forma directa o indirecta."
+        ]
+      }
+    },
+
+    "compassion_cruelty": {
+      "name": "Compasión ↔ Crueldad",
+      "left": {
+        "id": "compassion",
+        "label": "Compasión",
+        "description": "Cree en la redención y minimiza el sufrimiento; prioriza vidas y dignidad."
+      },
+      "right": {
+        "id": "cruelty",
+        "label": "Crueldad",
+        "description": "Usa el miedo como herramienta; ve la violencia y el castigo como eficaces."
+      },
+      "tensions": [
+        "prisoners_of_war",
+        "execution_or_mercy",
+        "civilian_collateral",
+        "torture_and_interrogation",
+        "public_punishment",
+        "refugees_and_outcasts"
+      ],
+      "manifestations": {
+        "low": [
+          "Se incomoda con brutalidad (compasión) o con debilidad (crueldad).",
+          "Sus diálogos muestran sensibilidad o dureza en detalles."
+        ],
+        "medium": [
+          "Puede desobedecer órdenes crueles o excederse en castigos sin permiso.",
+          "Pide clemencia o propone escarmientos para 'dar ejemplo'."
+        ],
+        "high": [
+          "Fuga/prisión de prisioneros por piedad, o masacres/abusos por crueldad.",
+          "Desencadena eventos extremos (linchamiento, rescates, represalias)."
+        ]
+      }
+    },
+
+    "order_pragmatism": {
+      "name": "Orden ↔ Pragmatismo",
+      "left": {
+        "id": "order",
+        "label": "Orden",
+        "description": "Respeta leyes, procedimientos y legitimidad; prefiere soluciones institucionales."
+      },
+      "right": {
+        "id": "pragmatism",
+        "label": "Pragmatismo",
+        "description": "Prioriza resultados; acepta atajos, corrupción o métodos grises si 'funcionan'."
+      },
+      "tensions": [
+        "law_and_trials",
+        "corruption_and_bribes",
+        "secret_police",
+        "smugglers_and_criminals",
+        "emergency_decrees",
+        "espionage"
+      ],
+      "manifestations": {
+        "low": [
+          "Insiste en 'hacerlo bien' (orden) o propone soluciones rápidas (pragmatismo).",
+          "Se frustra con burocracia o con improvisación."
+        ],
+        "medium": [
+          "Retrasa acciones por legalidad o avanza ignorando reglas.",
+          "Empieza a crear redes informales o a exigir tribunales y papeleo."
+        ],
+        "high": [
+          "Crisis internas: golpes burocráticos, corrupción sistémica o parálisis institucional.",
+          "Eventos: juicios ejemplares vs operaciones clandestinas que salen mal."
+        ]
+      }
+    },
+
+    "tradition_progress": {
+      "name": "Tradición ↔ Progreso",
+      "left": {
+        "id": "tradition",
+        "label": "Tradición",
+        "description": "Defiende costumbres, jerarquías y símbolos; teme que el cambio rompa la identidad del pueblo."
+      },
+      "right": {
+        "id": "progress",
+        "label": "Progreso",
+        "description": "Impulsa reformas e innovación; prioriza eficiencia y futuro sobre el pasado."
+      },
+      "tensions": [
+        "reforms",
+        "technology_and_industry",
+        "education_and_guilds",
+        "religious_customs",
+        "social_mobility",
+        "foreign_influence"
+      ],
+      "manifestations": {
+        "low": [
+          "Apoya ceremonias y costumbres (tradición) o celebra ideas nuevas (progreso).",
+          "Murmullos o entusiasmo ante cambios menores."
+        ],
+        "medium": [
+          "Resistencia pasiva (tradición) o presión constante por modernizar (progreso).",
+          "Conflictos con gremios, clero o juventud."
+        ],
+        "high": [
+          "Sabotajes/revueltas por reformas, o rupturas institucionales por cambios bruscos.",
+          "Eventos: cisma cultural, exilio de facciones o auge innovador con costos sociales."
+        ]
+      }
+    },
+
+    "honor_utilitarianism": {
+      "name": "Honor ↔ Utilitarismo",
+      "left": {
+        "id": "honor",
+        "label": "Honor",
+        "description": "Sigue códigos; rechaza engaños y abusos; valora la dignidad incluso en la guerra."
+      },
+      "right": {
+        "id": "utilitarianism",
+        "label": "Utilitarismo",
+        "description": "Acepta cualquier medio por un fin mayor; calcula costos humanos como parte de la estrategia."
+      },
+      "tensions": [
+        "ambushes_and_traps",
+        "dirty_warfare",
+        "sacrifices_and_decoys",
+        "assassination",
+        "broken_treaties",
+        "scorched_earth"
+      ],
+      "manifestations": {
+        "low": [
+          "Se indigna por tácticas sucias (honor) o por 'romanticismo' inútil (utilitarismo).",
+          "Su respeto o desprecio se nota en cómo evalúa victorias."
+        ],
+        "medium": [
+          "Puede negarse a cumplir órdenes deshonrosas o aplicarlas sin pedir permiso.",
+          "Empuja tácticas arriesgadas o exige duelos y acuerdos."
+        ],
+        "high": [
+          "Deserciones, motines morales o atrocidades estratégicas.",
+          "Eventos: desafío público a tu liderazgo, o victoria pírrica con consecuencias políticas."
+        ]
+      }
+    },
+
+    "faith_skepticism": {
+      "name": "Fe ↔ Escepticismo",
+      "left": {
+        "id": "faith",
+        "label": "Fe",
+        "description": "Cree en destino, dioses o ideales; necesita símbolos y narrativas para sostener el sacrificio."
+      },
+      "right": {
+        "id": "skepticism",
+        "label": "Escepticismo",
+        "description": "Confía en hechos y evidencia; desconfía del fanatismo, la propaganda y el poder absoluto."
+      },
+      "tensions": [
+        "propaganda_and_symbols",
+        "religious_policy",
+        "omens_and_fate",
+        "cult_activity",
+        "legitimacy_claims",
+        "war_justification"
+      ],
+      "manifestations": {
+        "low": [
+          "Se inspira con símbolos (fe) o los ridiculiza con calma (escepticismo).",
+          "Reacciona ante rituales, juramentos y discursos."
+        ],
+        "medium": [
+          "Puede radicalizarse o volverse abiertamente crítico y sembrar duda.",
+          "Empuja cruzadas morales o exige transparencia."
+        ],
+        "high": [
+          "Fanatismo peligroso (purga, caza de brujas) o conspiración racional (golpe silencioso).",
+          "Eventos: secta, herejía, fractura ideológica del reino."
+        ]
+      }
+    }
+  }
+}
