@@ -10,7 +10,6 @@ class Game:
         # Estado persistente del juego
         self.game_state = GameState()
 
-        # Estado actual (arranca en mundo)
         # Estado actual (arranca en menú)
         self.state = StartMenuState(self)
 
