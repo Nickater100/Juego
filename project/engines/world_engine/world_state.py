@@ -2,14 +2,17 @@
 
 from engines.world_engine.map_loader import TiledMap
 from engines.world_engine.collision import CollisionSystem
-from engines.world_engine.npc_controller import MovementController
 from engines.world_engine.dialogue_system import DialogueSystem
+from engines.world_engine.npc_system import NPCSystem
+from engines.world_engine.npc_controller import MovementController
+
 from core.entities.unit import Unit
 import pygame
 from core.config import TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT
 from render.world.camera import Camera
 from core.assets import asset_path
 import json
+
 from engines.world_engine.event_runner import EventRunner
 
 
@@ -43,12 +46,7 @@ class WorldState:
         # input lock global (runner/diálogo)
         self.input_locked = False
 
-        # NPC runtime
-        self.npc_units = {}
-        self.npc_controllers = {}
-        self.npc_tasks = {}
-
-        # filtrar NPC reclutados
+        # filtrar NPCs “data” reclutados (map.npcs)
         filtered = []
         for n in getattr(self.map, "npcs", []) or []:
             npc_id = n.get("id", "")
@@ -57,7 +55,9 @@ class WorldState:
             filtered.append(n)
         self.map.npcs = filtered
 
-        self.collision = CollisionSystem(self.map, get_npc_units=lambda: self.npc_units)
+        # collision + camera
+        # Nota: NPCSystem se crea después, así que pasamos lambda que consulte npc_system.units.
+        self.collision = CollisionSystem(self.map, get_npc_units=lambda: self.npc_system.units if hasattr(self, "npc_system") else {})
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         # spawn player
@@ -74,13 +74,14 @@ class WorldState:
         self.move_dir = None
         self.move_timer = 0
 
-        # Dialogue system (✅ todo el UI/input/render del diálogo vive acá)
+        # systems
         self.dialogue = DialogueSystem(self)
+        self.npc_system = NPCSystem(self, self.collision)
 
-        # Event runner
+        # events
         self.event_runner = EventRunner(self)
 
-        # estado assignments / roles
+        # roles/assignments
         self._event_assignments = {}
         self._event_apply_role_outcomes_step = None
 
@@ -100,7 +101,6 @@ class WorldState:
     # Input
     # -------------------------------
     def handle_event(self, event):
-        # diálogo consume input
         if self.dialogue.handle_event(event):
             return
 
@@ -142,6 +142,7 @@ class WorldState:
     # Update
     # -------------------------------
     def update(self, dt):
+        # player
         self.controller.update(dt)
         self.player.update_sprite(dt)
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
@@ -151,11 +152,10 @@ class WorldState:
         else:
             self.move_timer = 0
 
-        for ctrl in self.npc_controllers.values():
-            ctrl.update(dt)
-        for u in self.npc_units.values():
-            u.update_sprite(dt)
+        # NPCs (runtime)
+        self.npc_system.update(dt)
 
+        # puertas cooldown
         if self._door_cooldown > 0:
             self._door_cooldown -= dt
             if self._door_cooldown < 0:
@@ -196,13 +196,14 @@ class WorldState:
 
             self._door_was_inside = inside_any
 
+        # triggers
         if not self.input_locked:
             self._check_triggers()
 
+        # persist player tile
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
 
-        self._update_npc_tasks(dt)
-
+        # event runner
         if getattr(self, "event_runner", None):
             self.event_runner.update(dt)
 
@@ -217,14 +218,16 @@ class WorldState:
         npc_id = None
         npc_data = None
 
+        # map NPCs (data)
         for n in getattr(self.map, "npcs", []) or []:
             if n.get("tile_x") == tx and n.get("tile_y") == ty:
                 npc_data = n
                 npc_id = n.get("id")
                 break
 
+        # runtime NPCs (units)
         if npc_id is None:
-            for uid, u in getattr(self, "npc_units", {}).items():
+            for uid, u in self.npc_system.units.items():
                 if getattr(u, "tile_x", None) == tx and getattr(u, "tile_y", None) == ty:
                     npc_id = uid
                     break
@@ -232,6 +235,7 @@ class WorldState:
         if not npc_id:
             return
 
+        # event consume
         if getattr(self, "event_runner", None) and self.event_runner.active:
             if self.event_runner.on_player_interact(npc_id):
                 return
@@ -255,7 +259,7 @@ class WorldState:
     def open_dialogue(self, speaker: str, lines, options=None, context=None):
         self.dialogue.open(speaker, lines, options=options, context=context or {})
 
-    # --- acción recruit centralizada (llamada desde DialogueSystem) ---
+    # llamada desde DialogueSystem
     def _dialogue_action_recruit(self, unit_id: str, speaker: str, npc_id: str | None):
         if any(u.get("id") == unit_id for u in self.game.game_state.party):
             self.open_dialogue(
@@ -284,7 +288,7 @@ class WorldState:
         )
 
     # -------------------------------
-    # Triggers / tasks
+    # Triggers
     # -------------------------------
     def _check_triggers(self):
         player_rect = pygame.Rect(self.player.pixel_x, self.player.pixel_y, TILE_SIZE, TILE_SIZE)
@@ -302,44 +306,6 @@ class WorldState:
                 pass
             if once:
                 self._trigger_fired.add(obj_id)
-
-    def _update_npc_tasks(self, dt):
-        for npc_id, task in list(self.npc_tasks.items()):
-            if task.get("type") != "walk_to":
-                continue
-
-            unit = self.npc_units.get(npc_id)
-            ctrl = self.npc_controllers.get(npc_id)
-            if not unit or not ctrl:
-                self.npc_tasks.pop(npc_id, None)
-                continue
-
-            tx, ty = task["target"]
-
-            if unit.tile_x == tx and unit.tile_y == ty:
-                if task.get("despawn"):
-                    self.npc_units.pop(npc_id, None)
-                    self.npc_controllers.pop(npc_id, None)
-                    self.npc_tasks.pop(npc_id, None)
-                    self.game.game_state.set_npc(npc_id, active=False, map=None, tile=None)
-                continue
-
-            if unit.is_moving:
-                continue
-
-            dx = 0
-            dy = 0
-            if unit.tile_x < tx:
-                dx = 1
-            elif unit.tile_x > tx:
-                dx = -1
-            elif unit.tile_y < ty:
-                dy = 1
-            elif unit.tile_y > ty:
-                dy = -1
-
-            if dx != 0 or dy != 0:
-                ctrl.try_move(dx, dy)
 
     # -------------------------------
     # Assign Roles UI
@@ -388,7 +354,6 @@ class WorldState:
         if self._assign_idx >= len(self._assign_npcs):
             self._event_assignments.update(self._assignments_local)
             self._assign_active = False
-            # cerrar diálogo si estaba abierto
             if self.dialogue.active:
                 self.dialogue.close()
             if self.event_runner.active:
@@ -406,7 +371,6 @@ class WorldState:
         ]
 
         options = [{"text": r, "action": f"assign_role:{r}"} for r in self._assign_roles if self._assign_remaining.get(r, 0) > 0]
-
         if not options:
             options = [{"text": r, "action": f"assign_role:{r}"} for r in self._assign_roles]
 
@@ -434,7 +398,8 @@ class WorldState:
             self.player.pixel_y = py * TILE_SIZE
             self.game.game_state.set_player_tile(px, py)
 
-        self.spawn_intro_npcs_in_line()
+        # spawns intro (runtime)
+        self.npc_system.spawn_intro_line(self.markers, (self.player.tile_x, self.player.tile_y))
 
         event_path = asset_path("data", "events", "intro_assign_roles.json")
         with open(event_path, "r", encoding="utf-8") as f:
@@ -515,45 +480,7 @@ class WorldState:
         self.game.change_state(nuevo)
 
     # -------------------------------
-    # NPC spawn intro
-    # -------------------------------
-    def spawn_intro_npcs_in_line(self):
-        ids = ["selma_ironrose", "loren_valcrest", "iraen_falk", "elinya_brightwell"]
-        line_markers = ["line_1", "line_2", "line_3", "line_4"]
-
-        mx, my = self.markers.get("spawn_marian_intro", (self.player.tile_x + 1, self.player.tile_y))
-        if "marian_vell" not in self.npc_units:
-            self._spawn_npc_unit("marian_vell", mx, my)
-
-        for npc_id, m in zip(ids, line_markers):
-            tx, ty = self.markers.get(m, (self.player.tile_x + 3, self.player.tile_y))
-            if npc_id not in self.npc_units:
-                self._spawn_npc_unit(npc_id, tx, ty)
-
-    def _spawn_npc_unit(self, npc_id: str, tx: int, ty: int):
-        import os
-        npc_json_path = asset_path("sprites", "npcs", npc_id, f"{npc_id}.json")
-        walk_path = None
-        if os.path.exists(npc_json_path):
-            with open(npc_json_path, "r", encoding="utf-8") as f:
-                npc_data = json.load(f)
-            walk_path = npc_data.get("visual", {}).get("walk")
-
-        u = Unit(tile_x=tx, tile_y=ty)
-        u.pixel_x = tx * TILE_SIZE
-        u.pixel_y = ty * TILE_SIZE
-
-        if walk_path:
-            try:
-                u._walk_sheet = pygame.image.load(asset_path(*walk_path.split("/"))).convert_alpha()
-            except Exception:
-                pass
-
-        self.npc_units[npc_id] = u
-        self.npc_controllers[npc_id] = MovementController(u, self.collision)
-
-    # -------------------------------
-    # JSON helpers
+    # Map JSON helpers
     # -------------------------------
     def _load_map_json(self):
         if self._map_json_cache is None:
@@ -616,7 +543,7 @@ class WorldState:
             target = getattr(self, "markers", {}).get(marker_id)
             if target:
                 despawn = bool(cfg.get("despawn_on_arrival", False))
-                self.npc_tasks[npc_id] = {"type": "walk_to", "target": target, "despawn": despawn}
+                self.npc_system.set_walk_to(npc_id, target, despawn)
 
         effects = cfg.get("effects", []) or []
         for eff in effects:
@@ -625,9 +552,7 @@ class WorldState:
                     npc_id,
                     name=npc_id.replace("_", " ").title()
                 )
-                self.npc_units.pop(npc_id, None)
-                self.npc_controllers.pop(npc_id, None)
-                self.npc_tasks.pop(npc_id, None)
+                self.npc_system.remove(npc_id)
                 self.game.game_state.set_npc(npc_id, active=False, map=None, tile=None)
 
     # -------------------------------
@@ -639,10 +564,11 @@ class WorldState:
         self.map.draw(screen, self.camera, layer_order=("mapa",))
         self.player.draw(screen, self.camera)
 
-        for u in self.npc_units.values():
-            u.draw(screen, self.camera)
+        # runtime NPCs
+        self.npc_system.draw(screen, self.camera)
 
-        for n in getattr(self.map, "npcs", []):
+        # map NPC placeholders
+        for n in getattr(self.map, "npcs", []) or []:
             nx = n["tile_x"] * TILE_SIZE - self.camera.x
             ny = n["tile_y"] * TILE_SIZE - self.camera.y
             pygame.draw.rect(screen, (60, 80, 220), (nx, ny, TILE_SIZE, TILE_SIZE))
