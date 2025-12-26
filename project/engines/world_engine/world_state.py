@@ -620,15 +620,32 @@ class WorldState:
     def _start_assign_roles(self, step: dict) -> None:
         self._assign_step = step
         self._assign_active = True
+
         self._assign_npcs = list(step.get("npcs", []))
         self._assign_roles = list(step.get("roles", []))
         constraints = step.get("constraints", {}) or {}
 
+        # 1) cupos iniciales desde constraints (por defecto 1 si no viene)
         self._assign_remaining = {r: int(constraints.get(r, 1)) for r in self._assign_roles}
+
+        # 2) ✅ descontar lo ya asignado globalmente en el evento
+        #    (esto hace que las opciones "ocupadas" ya no aparezcan)
+        already = dict(getattr(self, "_event_assignments", {}) or {})
+        for _npc_id, role in already.items():
+            if role in self._assign_remaining:
+                self._assign_remaining[role] -= 1
+
+        # clamp a >= 0
+        for r in list(self._assign_remaining.keys()):
+            if self._assign_remaining[r] < 0:
+                self._assign_remaining[r] = 0
+
+        # 3) si este assign_roles viene para un solo npc, arrancamos en 0
         self._assign_idx = 0
         self._assignments_local = {}
 
         self._show_assign_prompt()
+
 
     def _assign_current_npc(self, role: str) -> None:
         if not getattr(self, "_assign_active", False):

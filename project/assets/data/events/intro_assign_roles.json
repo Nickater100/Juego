@@ -22,6 +22,7 @@
         "Mírelos bien. Lo que elija hoy definirá su primer paso… y su primer error."
       ]
     },
+
     {
       "type": "dialogue",
       "speaker": "Marian Vell",
@@ -29,8 +30,17 @@
       "trigger": "talk",
       "lines": [
         "¿Está listo para decidir el destino de su gente, mi lord?"
+      ],
+      "post": [
+        {
+          "type": "assign_roles",
+          "npc_from": "last_talk",
+          "roles": ["soldier", "advisor", "weapon_shop", "inn"],
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+        }
       ]
     },
+
     {
       "type": "dialogue",
       "speaker": "Selma Ironrose",
@@ -38,57 +48,69 @@
       "trigger": "talk",
       "lines": [
         "Bueno… ¿vamos a hacer esto rápido o quiere que traiga una silla?"
-      ]
-    },
-    {
-      "type": "dialogue",
-      "speaker": "Loren Valcrest",
-        "npc_id": "loren_valcrest",
-        "trigger": "talk",
-      "lines": [
-        "Solo diga mi nombre y ya tenemos a uno de los soldados resuelto."
-      ]
-    },
-    {
-      "type": "dialogue",
-      "speaker": "Iraen Falk",
-        "npc_id": "iraen_falk",
-        "trigger": "talk",
-      "lines": [
-        "Cumpliré lo que disponga, mi lord. Solo… hágalo con firmeza."
-      ]
-    },
-    {
-      "type": "dialogue",
-      "speaker": "Elinya Brightwell",
-        "npc_id": "elinya_brightwell",
-        "trigger": "talk",
-      "lines": [
-        "Estoy acá. Pase lo que pase… no está solo."
+      ],
+      "post": [
+        {
+          "type": "assign_roles",
+          "npc_from": "last_talk",
+          "roles": ["soldier", "advisor", "weapon_shop", "inn"],
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+        }
       ]
     },
 
     {
-      "type": "assign_roles",
-      "npcs": [
-        "marian_vell",
-        "selma_ironrose",
-        "loren_valcrest",
-        "iraen_falk",
-        "elinya_brightwell"
+      "type": "dialogue",
+      "speaker": "Loren Valcrest",
+      "npc_id": "loren_valcrest",
+      "trigger": "talk",
+      "lines": [
+        "Solo diga mi nombre y ya tenemos a uno de los soldados resuelto."
       ],
-      "roles": [
-        "soldier",
-        "advisor",
-        "weapon_shop",
-        "inn"
+      "post": [
+        {
+          "type": "assign_roles",
+          "npc_from": "last_talk",
+          "roles": ["soldier", "advisor", "weapon_shop", "inn"],
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+        }
+      ]
+    },
+
+    {
+      "type": "dialogue",
+      "speaker": "Iraen Falk",
+      "npc_id": "iraen_falk",
+      "trigger": "talk",
+      "lines": [
+        "Cumpliré lo que disponga, mi lord. Solo… hágalo con firmeza."
       ],
-      "constraints": {
-        "soldier": 2,
-        "advisor": 1,
-        "weapon_shop": 1,
-        "inn": 1
-      }
+      "post": [
+        {
+          "type": "assign_roles",
+          "npc_from": "last_talk",
+          "roles": ["soldier", "advisor", "weapon_shop", "inn"],
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+        }
+      ]
+    },
+
+    {
+      "type": "dialogue",
+      "speaker": "Elinya Brightwell",
+      "npc_id": "elinya_brightwell",
+      "trigger": "talk",
+      "lines": [
+        "Estoy acá. Pase lo que pase… no está solo."
+      ],
+      "post": [
+        {
+          "type": "assign_roles",
+          "npc_from": "last_talk",
+          "roles": ["soldier", "advisor", "weapon_shop", "inn"],
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+        }
+      ]
     },
 
     {
@@ -104,26 +126,25 @@
     },
 
     {
-  "type": "apply_role_outcomes",
-  "roles": {
-    "soldier": {
-      "effects": [{ "type": "join_party" }]
+      "type": "apply_role_outcomes",
+      "roles": {
+        "soldier": {
+          "effects": [{ "type": "join_party" }]
+        },
+        "weapon_shop": {
+          "move_to_marker": "exit_right",
+          "despawn_on_arrival": true
+        },
+        "inn": {
+          "move_to_marker": "exit_right",
+          "despawn_on_arrival": true
+        },
+        "advisor": {
+          "move_to_marker": "enter_house",
+          "despawn_on_arrival": true
+        }
+      }
     },
-    "weapon_shop": {
-      "move_to_marker": "exit_right",
-      "despawn_on_arrival": true
-    },
-    "inn": {
-      "move_to_marker": "exit_right",
-      "despawn_on_arrival": true
-    },
-    "advisor": {
-      "move_to_marker": "enter_house",
-      "despawn_on_arrival": true
-    }
-  }
-},
-
 
     {
       "type": "set_flag",
