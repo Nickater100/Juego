@@ -1,15 +1,18 @@
 # project/engines/world_engine/world_state.py
+from __future__ import annotations
 
-from engines.world_engine.map_loader import TiledMap
-from engines.world_engine.collision import CollisionSystem
-from engines.world_engine.npc_controller import MovementController
-from core.entities.unit import Unit
-import pygame
-from core.config import TILE_SIZE
-from render.world.camera import Camera
-from core.config import SCREEN_WIDTH, SCREEN_HEIGHT
-from core.assets import asset_path
 import json
+import os
+import pygame
+
+from core.assets import asset_path
+from core.config import TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT
+from core.entities.unit import Unit
+from engines.world_engine.collision import CollisionSystem
+from engines.world_engine.event_runner import EventRunner
+from engines.world_engine.map_loader import TiledMap
+from engines.world_engine.npc_controller import MovementController
+from render.world.camera import Camera
 
 
 class WorldState:
@@ -75,11 +78,6 @@ class WorldState:
         self.player = Unit(tile_x=px, tile_y=py)
         self.controller = MovementController(self.player, self.collision)
 
-        # --- NPC Units (para intro y tareas) ---
-        self.npc_units = {}        # npc_id -> Unit
-        self.npc_controllers = {}  # npc_id -> MovementController
-        self.npc_tasks = {}        # npc_id -> {"type": "walk_to", "target": (x,y), "despawn": bool}
-
         # Movimiento / UI diálogo
         self.move_dir = None
         self.move_timer = 0
@@ -104,14 +102,8 @@ class WorldState:
         self.portrait_cover = None
         self.portrait_cover_key = None
 
-        # Estado del runner de eventos
-        self._event_active = False
-        self._event_steps = []
-        self._event_idx = 0
-        self._event_context = {}
-        self._event_assignments = {}
-        self._event_role_to_marker = {}
-        self._event_post_actions = {}
+        # Event system
+        self.event_runner = EventRunner(self)
 
         # Estado UI assign_roles
         self._assign_active = False
@@ -122,10 +114,13 @@ class WorldState:
         self._assign_idx = 0
         self._assignments_local = {}
 
+        # Estado asignaciones de evento (lo usa _apply_role_outcomes_for_npc)
+        self._event_assignments = {}
+
         # Si es partida nueva (intro no hecho) arrancar evento intro automáticamente
         if not self.game.game_state.get_flag("intro_done", False):
             self.start_intro_event()
-        self._event_deferred_steps = []
+
     # -------------------------------
     # Input
     # -------------------------------
@@ -157,8 +152,8 @@ class WorldState:
                             ctx = dict(self.dialogue_context) if self.dialogue_context else {}
                             self.close_dialogue()
                             # Si el diálogo viene de un evento, avanzar evento
-                            if ctx.get("event") == "json_event":
-                                self._run_next_event_step()
+                            if ctx.get("event") == "json_event" and not ctx.get("after_dialogue"):
+                                self.event_runner.advance()
                         return
 
         if self.input_locked:
@@ -206,7 +201,7 @@ class WorldState:
 
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
 
-        if (not self.input_locked) and self.move_dir and not self.player.is_moving:
+        if (not self.input_locked) and self.move_dir and (not self.player.is_moving):
             self.controller.try_move(*self.move_dir)
         else:
             self.move_timer = 0
@@ -249,7 +244,7 @@ class WorldState:
                     door_hit = obj
                     break
 
-            if inside_any and not self._door_was_inside and door_hit:
+            if inside_any and (not self._door_was_inside) and door_hit:
                 props = self._props_to_dict(door_hit)
                 destino = props.get("map") or props.get("target_map")
                 if destino:
@@ -259,7 +254,7 @@ class WorldState:
 
             self._door_was_inside = inside_any
 
-        # Triggers (si los necesitás después, quedan listos)
+        # Triggers
         if not self.input_locked:
             self._check_triggers()
 
@@ -268,6 +263,10 @@ class WorldState:
 
         # NPC tasks (caminar + despawn)
         self._update_npc_tasks(dt)
+
+        # Event runner
+        if getattr(self, "event_runner", None):
+            self.event_runner.update(dt)
 
     def _check_triggers(self):
         player_rect = pygame.Rect(self.player.pixel_x, self.player.pixel_y, TILE_SIZE, TILE_SIZE)
@@ -342,85 +341,33 @@ class WorldState:
         tx = self.player.tile_x + dx
         ty = self.player.tile_y + dy
 
-        print(f"[LOG] try_interact: facing=({dx},{dy}) target=({tx},{ty}) input_locked={self.input_locked}")
-        print(f"[LOG] _event_pending_talk: {getattr(self, '_event_pending_talk', {})}")
-        print(f"[LOG] map.npcs: {getattr(self.map, 'npcs', [])}")
-
         npc_id = None
         npc_data = None
 
-        # 1) Buscar en map.npcs (si existieran)
+        # 1) NPCs del mapa
         for n in getattr(self.map, "npcs", []) or []:
             if n.get("tile_x") == tx and n.get("tile_y") == ty:
                 npc_data = n
                 npc_id = n.get("id")
                 break
 
-        # 2) Si no hay NPC en el mapa, buscar en npc_units (NPCs spawneados)
-        npc_unit = None
+        # 2) NPCs spawneados (Unit)
         if npc_id is None:
             for uid, u in getattr(self, "npc_units", {}).items():
                 if getattr(u, "tile_x", None) == tx and getattr(u, "tile_y", None) == ty:
-                    npc_unit = u
                     npc_id = uid
                     break
 
-        print(f"[LOG] npc_id found = {npc_id}")
-
         if not npc_id:
-            print("[LOG] No NPC found in front of player.")
             return
 
-        # ---------------------------
-        # Si el evento está activo y el NPC tiene diálogo pending del evento:
-        # ---------------------------
-        if self._event_active and npc_id in self._event_pending_talk:
-            step = self._event_pending_talk[npc_id]
+        # 3) Si hay evento activo, dejar que el runner consuma interacción
+        if getattr(self, "event_runner", None) and self.event_runner.active:
+            if self.event_runner.on_player_interact(npc_id):
+                return
 
-            def after_dialogue():
-                # consumir este pending
-                self._event_pending_talk.pop(npc_id, None)
-
-                # ✅ asignación después de hablar con ESTE npc
-                if not self.game.game_state.get_flag("intro_done", False) and npc_id in [
-                    "selma_ironrose", "loren_valcrest", "iraen_falk", "elinya_brightwell", "marian_vell"
-                ]:
-                    assign_step = {
-                        "npcs": [npc_id],
-                        "roles": ["soldier", "advisor", "weapon_shop", "inn"],
-                        "constraints": {"soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1}
-                    }
-                    # recomendado: bloquear input mientras elegís rol
-                    self.input_locked = True
-                    self._start_assign_roles(assign_step)
-                    return
-
-                # si no abre asignación y ya no quedan pendientes, seguir con diferidos
-                if not self._event_pending_talk:
-                    self.input_locked = True
-                    if getattr(self, "_event_deferred_steps", None):
-                        self._event_steps.extend(self._event_deferred_steps)
-                        self._event_deferred_steps = []
-                    self._run_next_event_step()
-
-            print(f"[LOG] Abriendo diálogo de evento para NPC {npc_id}")
-            self.open_dialogue(
-                step.get("speaker", ""),
-                step.get("lines", []),
-                options=None,
-                context={
-                    "npc_id": npc_id,
-                    "after_dialogue": after_dialogue,  # ✅ ACÁ
-                    # NO pongas event="json_event" acá, porque si no te auto-avanza el evento
-                }
-            )
-            return
-
-        # ---------------------------
-        # Interacción normal (si no hay evento / no hay pending talk)
-        # ---------------------------
+        # 4) Interacción normal
         if npc_data:
-            self.dialogue_context = {"after_dialogue": lambda: None}
             self.open_dialogue(
                 npc_data.get("name", ""),
                 npc_data.get("dialogue", []),
@@ -428,8 +375,6 @@ class WorldState:
                 context={"npc_id": npc_id, "npc": npc_data}
             )
         else:
-            # Si viene desde npc_unit, no hay diálogo normal definido en el mapa
-            self.dialogue_context = {"after_dialogue": lambda: None}
             self.open_dialogue(
                 npc_id.replace("_", " ").title(),
                 ["..."],
@@ -437,9 +382,10 @@ class WorldState:
                 context={"npc_id": npc_id}
             )
 
-    # Dialogue
     # -------------------------------
-    def open_dialogue(self, speaker: str, lines: list[str], options=None, context=None):
+    # Diálogo
+    # -------------------------------
+    def open_dialogue(self, speaker, lines, options=None, context=None):
         self.dialogue_active = True
         self.dialogue_speaker = speaker
         self.dialogue_lines = lines[:] if lines else ["..."]
@@ -449,13 +395,14 @@ class WorldState:
         self.dialogue_context = context or {}
 
     def close_dialogue(self):
-        # Ejecutar callback post-diálogo si existe
         after = self.dialogue_context.get("after_dialogue") if self.dialogue_context else None
-        # Si estamos en asignación de roles y el usuario cierra con ESC, avanzar igual para evitar cuelgues
+
+        # si es assign_roles y se cierra con ESC, avanzá para no colgar
         if self.dialogue_context and self.dialogue_context.get("event") == "assign_roles" and getattr(self, "_assign_active", False):
             self._assign_idx += 1
             self._show_assign_prompt()
             return
+
         self.dialogue_active = False
         self.dialogue_speaker = ""
         self.dialogue_lines = []
@@ -463,6 +410,7 @@ class WorldState:
         self.dialogue_options = []
         self.dialogue_option_index = 0
         self.dialogue_context = {}
+
         if after:
             after()
 
@@ -474,12 +422,10 @@ class WorldState:
         option = self.dialogue_options[self.dialogue_option_index]
         action = option.get("action", "close")
 
-        # -------------------------
-        # Eventos (runner JSON / asignación)
-        # -------------------------
+        # Eventos
         if action == "event_continue":
             self.close_dialogue()
-            self._run_next_event_step()
+            self.event_runner.advance()
             return
 
         if isinstance(action, str) and action.startswith("assign_role:"):
@@ -487,9 +433,7 @@ class WorldState:
             self._assign_current_npc(role)
             return
 
-        # -------------------------
         # Acciones normales
-        # -------------------------
         if action == "close":
             self.close_dialogue()
             return
@@ -519,7 +463,6 @@ class WorldState:
             self.dialogue_option_index = 0
             return
 
-        # Acción desconocida
         self.close_dialogue()
 
     def _trim_transparent(self, surface: pygame.Surface) -> pygame.Surface:
@@ -561,11 +504,10 @@ class WorldState:
         # --- Retrato dinámico según speaker ---
         portrait_surface = self.portrait_original
         portrait_key = "protagonist"
+
         speaker = self.dialogue_speaker.strip().lower().replace(" ", "_")
         if speaker in ["marian_vell", "selma_ironrose", "loren_valcrest", "iraen_falk", "elinya_brightwell"]:
             try:
-                import os
-                from core.assets import asset_path
                 npc_json_path = asset_path("sprites", "npcs", speaker, f"{speaker}.json")
                 if os.path.exists(npc_json_path):
                     with open(npc_json_path, "r", encoding="utf-8") as f:
@@ -619,7 +561,6 @@ class WorldState:
             screen.blit(name_surf, (text_x, text_y))
             text_y += 22
 
-        # Mostrar solo la línea actual
         current_text = self.dialogue_lines[self.dialogue_index] if self.dialogue_lines else "..."
         wrapped = wrap_lines(current_text, self.ui_font, text_area.width)
 
@@ -649,7 +590,6 @@ class WorldState:
     # Intro / evento inicial
     # -------------------------------
     def start_intro_event(self):
-        """Inicia el evento inicial leyendo el JSON de assets/data/events/intro_assign_roles.json."""
         if self.game.game_state.get_flag("intro_done", False):
             return
 
@@ -675,7 +615,7 @@ class WorldState:
         self.run_event(event_json)
 
     # -------------------------------
-    # Assign Roles UI (para step type: assign_roles)
+    # Assign Roles UI
     # -------------------------------
     def _start_assign_roles(self, step: dict) -> None:
         self._assign_step = step
@@ -699,10 +639,7 @@ class WorldState:
         npc_id = self._assign_npcs[self._assign_idx]
         self._assignments_local[npc_id] = role
 
-        # ✅ ESTA LINEA FALTABA
         self._event_assignments[npc_id] = role
-
-        # ahora sí, aplica lo que diga el JSON
         self._apply_role_outcomes_for_npc(npc_id)
 
         if role in self._assign_remaining and self._assign_remaining[role] > 0:
@@ -711,13 +648,13 @@ class WorldState:
         self._assign_idx += 1
         self._show_assign_prompt()
 
-
     def _show_assign_prompt(self) -> None:
         if self._assign_idx >= len(self._assign_npcs):
             self._event_assignments.update(self._assignments_local)
             self._assign_active = False
             self.close_dialogue()
-            self._run_next_event_step()
+            if getattr(self, "event_runner", None) and self.event_runner.active:
+                self.event_runner.on_assign_roles_done(self._event_assignments)
             return
 
         npc_id = self._assign_npcs[self._assign_idx]
@@ -749,119 +686,16 @@ class WorldState:
         )
 
     # -------------------------------
-    # Event Runner (JSON)
+    # Event hooks
     # -------------------------------
     def run_event(self, event_json):
-        # once_flag evita re-ejecutar
-        once_flag = event_json.get("once_flag")
-        if once_flag and self.game.game_state.get_flag(once_flag, False):
-            self.input_locked = False
-            return
-
-        self._event_active = True
-        self.input_locked = True
-
-        steps = list(event_json.get("steps", []))
-
-        # --- NUEVO: estructuras para "talk steps" y pasos diferidos ---
-        self._event_pending_talk = {}       # npc_id -> step (dialogue con trigger talk)
-        self._event_deferred_steps = []     # pasos a ejecutar luego de completar los talks
-
-        auto_steps = []
-        talk_phase_started = False
-
-        for step in steps:
-            # Capturamos diálogos que NO deben auto-ejecutarse
-            print("[LOG] run_event loaded steps:", len(steps))
-            print("[LOG] auto_steps:", [s.get("type") + ":" + (s.get("speaker","") or "") for s in auto_steps if s.get("type") == "dialogue"])
-            print("[LOG] pending_talk keys:", list(self._event_pending_talk.keys()))
-            print("[LOG] deferred steps:", [s.get("type") for s in self._event_deferred_steps])
-            if step.get("type") == "apply_role_outcomes":
-                self._event_apply_role_outcomes_step = step
-            if step.get("type") == "dialogue" and step.get("trigger") == "talk":
-                npc_id = step.get("npc_id")
-                if npc_id:
-                    self._event_pending_talk[npc_id] = step
-                talk_phase_started = True
-                continue
-
-            # Si ya apareció algún talk-step, todo lo posterior queda diferido (ej assign_roles)
-            if talk_phase_started:
-                self._event_deferred_steps.append(step)
-            else:
-                auto_steps.append(step)
-
-        # --- tu init normal ---
-        self._event_steps = auto_steps
-        self._event_idx = 0
-        self._event_context = {}
-        self._event_assignments = {}
-        self._event_role_to_marker = {}
-        self._event_post_actions = {}
-        self._ensure_event_npcs_spawned()
-        self._run_next_event_step()
-
+        self.event_runner.start(event_json)
 
     def _run_next_event_step(self):
-        # 1) Si se acabaron los pasos automáticos...
-        print(f"[LOG] _run_next_event_step: _event_pending_talk = {getattr(self, '_event_pending_talk', None)}")
-
-        if self._event_idx >= len(self._event_steps):
-            # Si todavía hay diálogos por hablar, NO finalizar el evento: pausarlo.
-            if getattr(self, "_event_pending_talk", None):
-                if len(self._event_pending_talk) > 0:
-                    print("[LOG] Evento pausado esperando diálogos por interacción.")
-                    self.input_locked = False
-                    self._event_active = True
-                    return
-
-            # Si ya no hay pendientes, ejecutar lo diferido
-            if getattr(self, "_event_deferred_steps", None):
-                if len(self._event_deferred_steps) > 0:
-                    print("[LOG] Reanudando evento con pasos diferidos.")
-                    self._event_steps.extend(self._event_deferred_steps)
-                    self._event_deferred_steps = []
-                    return self._run_next_event_step()
-
-            # Terminar evento
-            print("[LOG] Evento finalizado. input_locked=False, _event_active=False")
-            self.input_locked = False
-            self._event_active = False
-            return
-
-        # 2) Ejecutar el paso actual
-        step = self._event_steps[self._event_idx]
-        self._event_idx += 1
-        t = step.get("type")
-
-        if t == "dialogue":
-            lines = step.get("lines", [])
-            self.open_dialogue(
-                step.get("speaker", ""),
-                lines,
-                options=None,
-                context={"event": "json_event"}
-            )
-            return
-
-        if t == "assign_roles":
-            self._start_assign_roles(step)
-            return
-
-        if t == "apply_role_spawns":
-            self._event_role_to_marker = step.get("role_to_marker", {})
-            for npc_id, role in self._event_assignments.items():
-                marker = self._event_role_to_marker.get(role)
-                if marker:
-                    self._move_npc_to_marker(npc_id, marker)
-            return self._run_next_event_step()
-
-        if t == "set_flag":
-            self.game.game_state.set_flag(step.get("name"), step.get("value", True))
-            return self._run_next_event_step()
+        self.event_runner.advance()
 
     # -------------------------------
-    # Doors / map change
+    # Map change
     # -------------------------------
     def cambiar_mapa(self, destino, puerta_entrada=None):
         destino_path = asset_path(destino)
@@ -934,7 +768,6 @@ class WorldState:
     # NPC intro spawn + tasks
     # -------------------------------
     def spawn_intro_npcs_in_line(self):
-        # Marian + 4 en fila
         ids = ["selma_ironrose", "loren_valcrest", "iraen_falk", "elinya_brightwell"]
         line_markers = ["line_1", "line_2", "line_3", "line_4"]
 
@@ -948,34 +781,29 @@ class WorldState:
                 self._spawn_npc_unit(npc_id, tx, ty)
 
     def _spawn_npc_unit(self, npc_id: str, tx: int, ty: int):
-        # Cargar sprite personalizado si existe
-        import os
-        from core.assets import asset_path
         npc_json_path = asset_path("sprites", "npcs", npc_id, f"{npc_id}.json")
         walk_path = None
+
         if os.path.exists(npc_json_path):
-            import json
-            with open(npc_json_path, "r", encoding="utf-8") as f:
-                npc_data = json.load(f)
-            walk_path = npc_data.get("visual", {}).get("walk")
+            try:
+                with open(npc_json_path, "r", encoding="utf-8") as f:
+                    npc_data = json.load(f)
+                walk_path = npc_data.get("visual", {}).get("walk")
+            except Exception:
+                walk_path = None
+
         u = Unit(tile_x=tx, tile_y=ty)
         u.pixel_x = tx * TILE_SIZE
         u.pixel_y = ty * TILE_SIZE
+
         if walk_path:
             try:
                 u._walk_sheet = pygame.image.load(asset_path(*walk_path.split("/"))).convert_alpha()
             except Exception:
                 pass
+
         self.npc_units[npc_id] = u
         self.npc_controllers[npc_id] = MovementController(u, self.collision)
-
-    def npc_walk_to_marker_and_despawn(self, npc_id: str, marker_name: str):
-        if npc_id not in self.npc_units:
-            return
-        target = self.markers.get(marker_name)
-        if not target:
-            return
-        self.npc_tasks[npc_id] = {"type": "walk_to", "target": target, "despawn": True}
 
     # -------------------------------
     # Map JSON helpers
@@ -1009,7 +837,6 @@ class WorldState:
     def _load_markers(self) -> dict:
         markers = {}
         for obj in self._get_objectgroup("markers"):
-            # Usar el id de properties si existe
             name = None
             for prop in obj.get("properties", []):
                 if prop.get("name") == "id":
@@ -1042,69 +869,9 @@ class WorldState:
         if self.dialogue_active:
             self.render_dialogue(screen)
 
-    def _ensure_event_npcs_spawned(self):
-        """
-        Crea self.map.npcs (objetos interactuables) a partir de markers/posiciones del mapa.
-        Si ya existen, no hace nada.
-        """
-        if not hasattr(self.map, "npcs") or self.map.npcs is None:
-            self.map.npcs = []
-
-        if len(self.map.npcs) > 0:
-            return
-
-        # --- intentamos encontrar una fuente de spawns/markers ---
-        sources = []
-
-        # casos típicos
-        for attr in ("markers", "objects", "spawn_points", "points", "named_points"):
-            if hasattr(self.map, attr):
-                sources = getattr(self.map, attr) or []
-                if sources:
-                    break
-
-        # si no encontramos nada, salimos (y logueamos)
-        if not sources:
-            print("[LOG] No marker source found on map to spawn NPCs.")
-            return
-
-        # IDs que tu evento necesita (ajustá si tenés más)
-        needed_ids = {"selma_ironrose", "loren_valcrest", "iraen_falk", "elinya_brightwell"}
-
-        for obj in sources:
-            # Estos keys varían según tu loader de mapas; probamos los comunes:
-            obj_id = obj.get("id") or obj.get("name") or obj.get("marker_id")
-            if obj_id not in needed_ids:
-                continue
-
-            # Posición en tiles: a veces viene como tile_x/tile_y o x/y (pixel)
-            tile_x = obj.get("tile_x")
-            tile_y = obj.get("tile_y")
-
-            if tile_x is None or tile_y is None:
-                # si viene en pixels:
-                x = obj.get("x")
-                y = obj.get("y")
-                if x is None or y is None:
-                    continue
-                # asumimos tile_size; usá el tuyo real si es distinto
-                tile_size = getattr(self.map, "tile_size", 32)
-                tile_x = int(x // tile_size)
-                tile_y = int(y // tile_size)
-
-            # Construimos un NPC mínimo interactuable
-            npc = {
-                "id": obj_id,
-                "name": obj_id.replace("_", " ").title(),
-                "tile_x": tile_x,
-                "tile_y": tile_y,
-                "dialogue": [],    # el evento usa open_dialogue con step, así que acá puede estar vacío
-                "options": []
-            }
-            self.map.npcs.append(npc)
-
-        print(f"[LOG] Spawned NPCs into map.npcs: {[n['id'] for n in self.map.npcs]}")
-
+    # -------------------------------
+    # Event-related helper (si lo usa el runner)
+    # -------------------------------
     def _apply_role_outcomes_for_npc(self, npc_id: str) -> None:
         step = getattr(self, "_event_apply_role_outcomes_step", None)
         if not step:
@@ -1117,31 +884,24 @@ class WorldState:
         roles_cfg = step.get("roles", {}) or {}
         cfg = roles_cfg.get(role, {}) or {}
 
-        # 1) mover a marker (si corresponde)
         marker_id = cfg.get("move_to_marker")
         if marker_id:
             target = getattr(self, "markers", {}).get(marker_id)
-            if not target:
-                print(f"[LOG] marker_id '{marker_id}' no existe en self.markers")
-            else:
+            if target:
                 despawn = bool(cfg.get("despawn_on_arrival", False))
                 self.npc_tasks[npc_id] = {"type": "walk_to", "target": target, "despawn": despawn}
 
-        # 2) efectos (lista)
         effects = cfg.get("effects", []) or []
         for eff in effects:
             et = eff.get("type")
-
             if et == "join_party":
                 self.game.game_state.add_party_member(
                     npc_id,
                     name=npc_id.replace("_", " ").title()
                 )
-                # opcional: sacarlo del mundo si ahora está en party
                 self.npc_units.pop(npc_id, None)
                 self.npc_controllers.pop(npc_id, None)
                 self.npc_tasks.pop(npc_id, None)
                 self.game.game_state.set_npc(npc_id, active=False, map=None, tile=None)
-
             else:
                 print(f"[LOG] Unknown role outcome effect: {et}")
