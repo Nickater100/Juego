@@ -185,6 +185,14 @@ class WorldState:
 
     # llamada desde DialogueSystem
     def _dialogue_action_recruit(self, unit_id: str, speaker: str, npc_id: str | None):
+        """Recluta una unidad y persiste sus stats.
+
+        - Si existe un JSON de NPC en assets/sprites/npcs/<id>/<id>.json, toma stats desde:
+            combat_profile.base_stats
+        y los normaliza para el menú de Ejército (hp/atk/def/level/clase).
+        - Guarda esos stats dentro de party_unit["extra"] para que el pause menu los lea.
+        """
+        # Evitar duplicados
         if any(u.get("id") == unit_id for u in self.game.game_state.party):
             self.open_dialogue(
                 speaker,
@@ -194,13 +202,73 @@ class WorldState:
             )
             return
 
+        # Intentar obtener stats desde el JSON del NPC (sprites/npcs)
+        npc_key = str(npc_id or unit_id)
+        npc_stats: dict = {}
+        try:
+            from core.assets import asset_path  # import local para evitar ciclos en import time
+            import os as _os
+            import json as _json
+
+            npc_json_path = asset_path("sprites", "npcs", npc_key, f"{npc_key}.json")
+            if _os.path.exists(npc_json_path):
+                with open(npc_json_path, "r", encoding="utf-8") as f:
+                    npc_data = _json.load(f) or {}
+
+                combat_profile = npc_data.get("combat_profile") or {}
+                base_stats = combat_profile.get("base_stats") or {}
+
+                # Normalización para UI (Ejército espera hp/atk/def)
+                level = base_stats.get("level", 1)
+                hp = base_stats.get("hp", base_stats.get("HP", 18))
+
+                # En tus JSON: 'str' representa el ataque base
+                atk = base_stats.get("atk", base_stats.get("str", base_stats.get("strength", 5)))
+
+                # 'def' puede venir como 'def' o 'defense'
+                deff = base_stats.get("def", base_stats.get("defense", 3))
+
+                # Clase (si no existe en JSON, default razonable)
+                unit_class = combat_profile.get("class") or combat_profile.get("unit_class") or "soldier"
+
+                # Guardar también el bloque completo para futuras pantallas
+                npc_stats = {
+                    "level": level,
+                    "class": unit_class,
+                    "hp": hp,
+                    "atk": atk,
+                    "def": deff,
+                    # stats secundarios (si existen)
+                    "dex": base_stats.get("dex"),
+                    "spd": base_stats.get("spd"),
+                    "res": base_stats.get("res"),
+                    "cha": base_stats.get("cha"),
+                    # conservar para depuración / futuros sistemas
+                    "stats": dict(base_stats),
+                    "source": {"npc_json": npc_json_path},
+                }
+        except Exception:
+            npc_stats = {}
+
+        # Fallback por si no hay JSON o vino incompleto
+        if not npc_stats:
+            npc_stats = {
+                "level": 1,
+                "class": "soldier",
+                "hp": 18,
+                "atk": 5,
+                "def": 3,
+            }
+
+        # Persistir en party con el esquema que espera pause_state: party_unit["extra"]
         self.game.game_state.add_party_member(
             unit_id=unit_id,
             name=speaker,
-            extra={"level": 1, "class": "soldier", "hp": 18, "atk": 5, "def": 3}
+            extra={"extra": npc_stats}
         )
         self.game.game_state.set_flag(f"recruited:{unit_id}", True)
 
+        # Remover el NPC del mapa (si corresponde)
         if npc_id:
             self.map.npcs = [n for n in getattr(self.map, "npcs", []) if n.get("id") != npc_id]
 

@@ -2,12 +2,47 @@
   "version": 2,
   "current_map_id": "town_01",
   "player_tile": [
-    11,
-    12
+    12,
+    14
   ],
   "story_flags": {
-    "intro_done": false
+    "intro_done": true
   },
-  "party": [],
-  "npcs": {}
+  "party": [
+    {
+      "id": "loren_valcrest",
+      "name": "Loren Valcrest"
+    },
+    {
+      "id": "elinya_brightwell",
+      "name": "Elinya Brightwell"
+    }
+  ],
+  "npcs": {
+    "loren_valcrest": {
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "elinya_brightwell": {
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "iraen_falk": {
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "marian_vell": {
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "selma_ironrose": {
+      "active": false,
+      "map": null,
+      "tile": null
+    }
+  }
 }
