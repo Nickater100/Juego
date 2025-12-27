@@ -22,6 +22,8 @@ import json
 
 class WorldState:
     def __init__(self, game, map_rel_path=("maps", "world", "town_01.json"), spawn_tile=None):
+        from collections import deque
+
         self.game = game
 
         if isinstance(map_rel_path, (tuple, list)):
@@ -31,7 +33,6 @@ class WorldState:
 
         self.map = TiledMap(json_path=json_path, assets_root=asset_path(""))
 
-        # Map data/cache helpers
         self.map_data = MapData(self.map.json_path, tile_size=TILE_SIZE)
 
         self.markers = self.map_data.load_markers()
@@ -40,7 +41,7 @@ class WorldState:
 
         self.input_locked = False
 
-        # collision + camera
+        # ✅ collision (SIN tile_size)
         self.collision = CollisionSystem(
             self.map,
             get_npc_units=lambda: self.npc_system.units if hasattr(self, "npc_system") else {}
@@ -57,7 +58,7 @@ class WorldState:
         self.player = Unit(tile_x=px, tile_y=py)
         self.controller = MovementController(self.player, self.collision)
 
-        # input movimiento
+        # input
         self.move_dir = None
         self.move_timer = 0
 
@@ -68,18 +69,40 @@ class WorldState:
         self.transitions = MapTransitionSystem(self)
         self.assign_roles = AssignRolesSystem(self)
 
-        # filtrar NPCs del mapa (data)
         self.map.npcs = self.npc_system.filter_map_npcs(getattr(self.map, "npcs", []) or [])
 
-        # eventos
         self.event_runner = EventRunner(self)
-
-        # assignments / outcomes step (el runner lo setea)
         self._event_assignments = {}
         self._event_apply_role_outcomes_step = None
 
         if not self.game.game_state.get_flag("intro_done", False):
             self.start_intro_event()
+
+        # -----------------------------
+        # ✅ Guardaespaldas (follow natural)
+        # -----------------------------
+        if not hasattr(self.game.game_state, "bodyguards"):
+            self.game.game_state.bodyguards = []
+
+        self._bg_prefix = "bg__"
+        self._bodyguard_runtime_ids = []
+        self._last_player_tile = (self.player.tile_x, self.player.tile_y)
+
+        # Cola de posiciones previas del player (para "lag" suave)
+        # Mientras más larga, más estable cuando el player camina seguido.
+        self._follow_history = deque(maxlen=32)
+        self._follow_history.appendleft(self._last_player_tile)
+
+        # Ajustes de comportamiento
+        self._follow_min_gap = 1          # cada guardaespaldas toma un tile distinto de atraso
+        self._follow_snap_distance = 10   # si se desincronizan mucho, recién ahí corrige
+
+        self.sync_bodyguards()
+
+
+        # --------------------------------
+        # Compat: usado por Interaction/Transition systems
+        # --------------------------------
 
     # --------------------------------
     # Compat: usado por Interaction/Transition systems
@@ -132,6 +155,7 @@ class WorldState:
     # Update
     # -------------------------------
     def update(self, dt):
+        # actualizar jugador
         self.controller.update(dt)
         self.player.update_sprite(dt)
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
@@ -141,9 +165,17 @@ class WorldState:
         else:
             self.move_timer = 0
 
+        # ✅ Guardaespaldas: si el jugador cambió de tile, actualizar fila
+        try:
+            self._update_bodyguards_follow()
+        except Exception:
+            pass
+
+        # actualizar NPCs / sistemas del mundo
         self.npc_system.update(dt)
         self.interactions.update(dt)
 
+        # persistir tile del jugador
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
 
         self.event_runner.update(dt)
@@ -355,3 +387,229 @@ class WorldState:
             pygame.draw.rect(screen, (60, 80, 220), (nx, ny, TILE_SIZE, TILE_SIZE))
 
         self.dialogue.render(screen)
+
+    def sync_bodyguards(self) -> None:
+        """Sincroniza los guardaespaldas con unidades runtime en el mundo.
+
+        - Spawnea runtime units con id 'bg__<unit_id>'
+        - NO hace teleports agresivos: solo los coloca cerca al principio y luego siguen natural.
+        """
+        desired = []
+        try:
+            desired = list(getattr(self.game.game_state, "bodyguards", []) or [])
+        except Exception:
+            desired = []
+
+        party_ids = set()
+        try:
+            party_ids = {
+                str(u.get("id") or u.get("unit_id"))
+                for u in (self.game.game_state.party or [])
+                if (u.get("id") or u.get("unit_id"))
+            }
+        except Exception:
+            party_ids = set()
+
+        desired = [str(x) for x in desired if str(x) in party_ids]
+        self.game.game_state.bodyguards = desired
+
+        # runtime ids deseados
+        desired_runtime = [self._bg_prefix + uid for uid in desired]
+
+        # despawn los que sobran
+        current_runtime = [
+            rid for rid in list(getattr(self.npc_system, "units", {}).keys())
+            if str(rid).startswith(self._bg_prefix)
+        ]
+        for rid in current_runtime:
+            if rid not in desired_runtime:
+                try:
+                    self.npc_system.despawn_unit(rid)
+                except Exception:
+                    pass
+
+        # spawn faltantes cerca del player
+        px, py = self.player.tile_x, self.player.tile_y
+        for uid in desired:
+            rid = self._bg_prefix + uid
+            if rid in getattr(self.npc_system, "units", {}):
+                continue
+            try:
+                self.npc_system.spawn_runtime_unit(rid, uid, px, py)
+            except Exception:
+                pass
+
+        self._bodyguard_runtime_ids = [self._bg_prefix + uid for uid in desired]
+
+        # reset del history para que arranquen ordenados detrás del player
+        self._last_player_tile = (self.player.tile_x, self.player.tile_y)
+        try:
+            self._follow_history.clear()
+        except Exception:
+            pass
+        self._follow_history.appendleft(self._last_player_tile)
+
+        # colocarlos formando fila inicial (sin parpadeo)
+        # si el tile del player es (x,y), ponemos a todos en (x,y) al inicio pero sin teletransportes posteriores
+        for rid in self._bodyguard_runtime_ids:
+            u = getattr(self.npc_system, "units", {}).get(rid)
+            if not u:
+                continue
+            u.tile_x = px
+            u.tile_y = py
+            u.pixel_x = px * TILE_SIZE
+            u.pixel_y = py * TILE_SIZE
+            u.target_x = u.pixel_x
+            u.target_y = u.pixel_y
+            u.is_moving = False
+
+
+    def get_lethal_combat_party(self) -> list[dict]:
+        """Lista de unidades que participan en un combate letal por traición/emboscada.
+
+        Regla: sólo guardaespaldas asignados desde el menú de pausa.
+        """
+        try:
+            bg = set(str(x) for x in (getattr(self.game.game_state, "bodyguards", []) or []))
+        except Exception:
+            bg = set()
+
+        try:
+            party = list(self.game.game_state.party or [])
+        except Exception:
+            party = []
+
+        return [u for u in party if str(u.get("id") or u.get("unit_id")) in bg]
+
+    def _teleport_unit_to_tile(self, unit: Unit, tx: int, ty: int) -> None:
+        unit.tile_x = int(tx)
+        unit.tile_y = int(ty)
+        unit.pixel_x = unit.tile_x * TILE_SIZE
+        unit.pixel_y = unit.tile_y * TILE_SIZE
+        unit.is_moving = False
+
+    def _update_bodyguards_follow(self) -> None:
+        """Follow natural: usa historial de tiles del player y mueve en cadena.
+
+        Claves:
+        - Cada guardaespaldas i apunta a una posición del historial (lag = i+1).
+        - Planifica movimientos para evitar que se bloqueen entre sí.
+        - Evita teleports salvo desincronización extrema (map transition/atasco).
+        """
+        if not self._bodyguard_runtime_ids:
+            return
+
+        current_tile = (self.player.tile_x, self.player.tile_y)
+        if current_tile != self._last_player_tile:
+            # metemos la posición anterior del player al historial
+            self._follow_history.appendleft(self._last_player_tile)
+            self._last_player_tile = current_tile
+
+        # snapshot unidades
+        units = getattr(self.npc_system, "units", {})
+        controllers = getattr(self.npc_system, "controllers", {})
+
+        # 1) calcular target tile de cada guardaespaldas según historial
+        # lag = (index + 1) * gap
+        targets = {}
+        for i, rid in enumerate(self._bodyguard_runtime_ids):
+            lag = (i + 1) * self._follow_min_gap
+            if lag < len(self._follow_history):
+                targets[rid] = self._follow_history[lag]
+            else:
+                targets[rid] = self._follow_history[-1]
+
+        # 2) plan de movimientos: quién se mueve y quién "vacía" su tile
+        current_pos = {}
+        for rid in self._bodyguard_runtime_ids:
+            u = units.get(rid)
+            if u:
+                current_pos[rid] = (u.tile_x, u.tile_y)
+
+        will_move = set()
+        will_vacate_tiles = set()
+        for rid, tgt in targets.items():
+            cur = current_pos.get(rid)
+            if cur and tgt != cur:
+                will_move.add(rid)
+                will_vacate_tiles.add(cur)
+
+        # 3) ejecutar movimientos en orden (del más cercano al player al más lejano)
+        # evitando:
+        # - moverse si está en animación
+        # - pisar un tile ocupado por otro guardaespaldas que NO se va a mover
+        # - teleports salvo que estén demasiado lejos
+        bg_set = set(self._bodyguard_runtime_ids)
+
+        for rid in self._bodyguard_runtime_ids:
+            u = units.get(rid)
+            ctrl = controllers.get(rid)
+            if not u or not ctrl:
+                continue
+
+            tgt = targets.get(rid, (u.tile_x, u.tile_y))
+
+            # si ya está moviéndose, no tocar
+            if u.is_moving:
+                continue
+
+            # si está demasiado lejos, snap (solo casos extremos)
+            manhattan = abs(u.tile_x - tgt[0]) + abs(u.tile_y - tgt[1])
+            if manhattan >= self._follow_snap_distance:
+                u.tile_x, u.tile_y = tgt
+                u.pixel_x = tgt[0] * TILE_SIZE
+                u.pixel_y = tgt[1] * TILE_SIZE
+                u.target_x = u.pixel_x
+                u.target_y = u.pixel_y
+                u.is_moving = False
+                continue
+
+            # ya en target
+            if (u.tile_x, u.tile_y) == tgt:
+                continue
+
+            # dirección 4-dir hacia target
+            dx = 0
+            dy = 0
+            if u.tile_x < tgt[0]:
+                dx = 1
+            elif u.tile_x > tgt[0]:
+                dx = -1
+            elif u.tile_y < tgt[1]:
+                dy = 1
+            elif u.tile_y > tgt[1]:
+                dy = -1
+
+            if dx == 0 and dy == 0:
+                continue
+
+            next_tile = (u.tile_x + dx, u.tile_y + dy)
+
+            # Regla anti-traba:
+            # Si next_tile está ocupado por otro guardaespaldas que NO va a vaciar su tile, no mover.
+            blocked_by_bg = False
+            for other_id in self._bodyguard_runtime_ids:
+                if other_id == rid:
+                    continue
+                ou = units.get(other_id)
+                if not ou:
+                    continue
+                if (ou.tile_x, ou.tile_y) == next_tile:
+                    # si ese otro NO se mueve, bloquea
+                    if other_id not in will_move:
+                        blocked_by_bg = True
+                    else:
+                        # si se mueve, solo permitimos si su tile está en vacate (o sea, lo deja)
+                        if (ou.tile_x, ou.tile_y) not in will_vacate_tiles:
+                            blocked_by_bg = True
+                    break
+
+            if blocked_by_bg:
+                continue
+
+            # set facing y mover:
+            u.set_facing(dx, dy)
+
+            # acá ignoramos a todos los bodyguards en la colisión,
+            # pero mantenemos colisión con NPCs/mapa.
+            ctrl.try_move(dx, dy, ignore_unit_ids=bg_set)

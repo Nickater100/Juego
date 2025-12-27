@@ -5,14 +5,14 @@ class MovementController:
         self.unit = unit
         self.collision = collision
 
-    def try_move(self, dx, dy):
+    def try_move(self, dx, dy, ignore_unit_ids=None):
         if self.unit.is_moving:
             return
 
         target_x = self.unit.tile_x + dx
         target_y = self.unit.tile_y + dy
 
-        if not self.collision.can_move_to(target_x, target_y):
+        if not self.collision.can_move_to(target_x, target_y, ignore_unit_ids=ignore_unit_ids):
             return  # ❌ bloqueado
 
         self.unit.tile_x = target_x
@@ -21,6 +21,7 @@ class MovementController:
         self.unit.target_x = target_x * TILE_SIZE
         self.unit.target_y = target_y * TILE_SIZE
         self.unit.is_moving = True
+
 
     def update(self, dt):
         if not self.unit.is_moving:

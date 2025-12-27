@@ -95,8 +95,6 @@ class NPCSystem:
                 walk_path = None
 
         u = Unit(tile_x=tx, tile_y=ty)
-        u.pixel_x = tx * TILE_SIZE
-        u.pixel_y = ty * TILE_SIZE
 
         if walk_path:
             try:
@@ -206,3 +204,43 @@ class NPCSystem:
                 )
                 self.remove(npc_id)
                 self.ws.game.game_state.set_npc(npc_id, active=False, map=None, tile=None)
+
+    def spawn_runtime_unit(self, runtime_id: str, sprite_id: str, tx: int, ty: int) -> None:
+        """Spawnea un Unit en runtime usando el sprite/JSON de `sprite_id`, pero registrándolo con `runtime_id`.
+
+        Esto permite tener guardaespaldas siguiendo al jugador sin pisar NPCs del mapa.
+        """
+        runtime_id = str(runtime_id)
+        sprite_id = str(sprite_id)
+
+        if runtime_id in self.units:
+            return
+
+        npc_json_path = asset_path("sprites", "npcs", sprite_id, f"{sprite_id}.json")
+        walk_path = None
+        if os.path.exists(npc_json_path):
+            try:
+                with open(npc_json_path, "r", encoding="utf-8") as f:
+                    npc_data = json.load(f)
+                walk_path = npc_data.get("visual", {}).get("walk")
+            except Exception:
+                walk_path = None
+
+        u = Unit(tile_x=tx, tile_y=ty)
+
+        if walk_path:
+            try:
+                u._walk_sheet = pygame.image.load(asset_path(*walk_path.split("/"))).convert_alpha()
+            except Exception:
+                pass
+
+        self.units[runtime_id] = u
+        self.controllers[runtime_id] = MovementController(u, self.collision)
+
+    def despawn_unit(self, runtime_id: str) -> None:
+        """Elimina un Unit previamente spawneado en runtime."""
+        runtime_id = str(runtime_id)
+        if runtime_id in self.units:
+            del self.units[runtime_id]
+        if runtime_id in self.controllers:
+            del self.controllers[runtime_id]

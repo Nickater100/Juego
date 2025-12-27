@@ -2,8 +2,8 @@
   "version": 2,
   "current_map_id": "town_01",
   "player_tile": [
-    12,
-    14
+    13,
+    13
   ],
   "story_flags": {
     "intro_done": true
@@ -17,6 +17,10 @@
       "id": "elinya_brightwell",
       "name": "Elinya Brightwell"
     }
+  ],
+  "bodyguards": [
+    "elinya_brightwell",
+    "loren_valcrest"
   ],
   "npcs": {
     "loren_valcrest": {
@@ -34,12 +38,12 @@
       "map": null,
       "tile": null
     },
-    "marian_vell": {
+    "selma_ironrose": {
       "active": false,
       "map": null,
       "tile": null
     },
-    "selma_ironrose": {
+    "marian_vell": {
       "active": false,
       "map": null,
       "tile": null

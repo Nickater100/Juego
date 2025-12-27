@@ -69,8 +69,10 @@ class GameState:
             "player_tile": [self.player_tile[0], self.player_tile[1]],
             "story_flags": dict(self.story_flags),
             "party": list(self.party),
+            "bodyguards": list(self.bodyguards),
             "npcs": dict(self.npcs),  # ✅ IMPORTANTE
         }
+
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "GameState":
@@ -85,6 +87,8 @@ class GameState:
 
         gs.story_flags = dict(data.get("story_flags", {}))
         gs.party = list(data.get("party", []))
+
+        gs.bodyguards = list(data.get("bodyguards", []))
 
         # ✅ IMPORTANTE: mantener roles/estado de NPCs
         gs.npcs = dict(data.get("npcs", {}))

@@ -14,20 +14,26 @@ class PauseState:
         self.font = pygame.font.SysFont(None, 32)
         self.small_font = pygame.font.SysFont(None, 24)
 
-        self.mode = "menu"  # "menu" | "army" | "unit"
+        # menu | army | unit | bodyguards
+        self.mode = "menu"
         self.selected_unit = None
 
-        self.options = ["Ejército", "Guardar", "EXIT"]
+        self.options = ["Ejército", "Guardaespaldas", "Guardar", "EXIT"]
         self.option_index = 0
 
         self.army_cols = 4
         self.army_index = 0
+
+        # Guardaespaldas (companions en fila durante exploración)
+        self.max_bodyguards = 3
+        self.bodyguard_index = 0
 
         self.toast = ""
         self.toast_timer = 0.0
 
         # ✅ cache de JSON de unidades para no leer disco todo el tiempo
         self._unit_cache = {}  # unit_id -> dict cargado
+
 
     # -------------------------
     # Input
@@ -36,27 +42,50 @@ class PauseState:
         if event.type != pygame.KEYDOWN:
             return
 
+        # -------------------------
+        # Salir / volver
+        # -------------------------
         if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
             if self.mode == "unit":
                 self.mode = "army"
                 self.selected_unit = None
                 return
-            if self.mode == "army":
+            if self.mode in ("army", "bodyguards"):
                 self.mode = "menu"
                 return
+
+            # volver al mundo + sincronizar guardaespaldas en exploración
+            if hasattr(self.world_state, "sync_bodyguards"):
+                try:
+                    self.world_state.sync_bodyguards()
+                except Exception:
+                    pass
+
             self.game.change_state(self.world_state)
             return
 
+        # Atajo: cerrar pausa
         if event.key in (pygame.K_RETURN, pygame.K_p) and self.mode == "menu":
+            if hasattr(self.world_state, "sync_bodyguards"):
+                try:
+                    self.world_state.sync_bodyguards()
+                except Exception:
+                    pass
             self.game.change_state(self.world_state)
             return
 
+        # -------------------------
+        # Modo específico
+        # -------------------------
         if self.mode == "menu":
             self._handle_menu_input(event)
         elif self.mode == "army":
             self._handle_army_input(event)
-        elif self.mode == "unit":
+        elif self.mode == "bodyguards":
+            self._handle_bodyguards_input(event)
+        else:
             self._handle_unit_input(event)
+
 
     def _handle_menu_input(self, event):
         if event.key == pygame.K_w:
@@ -71,6 +100,13 @@ class PauseState:
                 self.army_index = 0
                 return
 
+            if chosen == "Guardaespaldas":
+                if not hasattr(self.game.game_state, "bodyguards"):
+                    self.game.game_state.bodyguards = []
+                self.mode = "bodyguards"
+                self.bodyguard_index = 0
+                return
+
             if chosen == "Guardar":
                 try:
                     from core.save_manager import save_game
@@ -80,13 +116,14 @@ class PauseState:
                     self.toast_timer = 2.0
                 except Exception as e:
                     print(f"[SAVE] Error: {e}")
-                    self.toast = f"Error al guardar: {e}"
-                    self.toast_timer = 3.0
+                    self.toast = "Error al guardar ❌"
+                    self.toast_timer = 2.0
                 return
 
             if chosen == "EXIT":
                 pygame.quit()
                 sys.exit(0)
+
 
     def _handle_unit_input(self, event):
         # por ahora nada
@@ -143,8 +180,11 @@ class PauseState:
             self._render_menu(screen)
         elif self.mode == "army":
             self._render_army(screen)
+        elif self.mode == "bodyguards":
+            self._render_bodyguards(screen)
         else:
             self._render_unit(screen)
+
 
     # -------------------------
     # Data helpers (✅ lo importante)
@@ -381,4 +421,127 @@ class PauseState:
             y += 36 if line == "" else 30
 
         hint = self.small_font.render("ESC volver", True, (200, 200, 200))
+        screen.blit(hint, (24, h - 32))
+
+    def _handle_bodyguards_input(self, event):
+        party = self.game.game_state.party or []
+
+        if not hasattr(self.game.game_state, "bodyguards"):
+            self.game.game_state.bodyguards = []
+
+        bodyguards = list(self.game.game_state.bodyguards or [])
+
+        if not party:
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                self.mode = "menu"
+            return
+
+        rows = max(1, (len(party) + self.army_cols - 1) // self.army_cols)
+        cols = self.army_cols
+
+        x = self.bodyguard_index % cols
+        y = self.bodyguard_index // cols
+
+        if event.key == pygame.K_a:
+            x = max(0, x - 1)
+        elif event.key == pygame.K_d:
+            x = min(cols - 1, x + 1)
+        elif event.key == pygame.K_w:
+            y = max(0, y - 1)
+        elif event.key == pygame.K_s:
+            y = min(rows - 1, y + 1)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            chosen = party[self.bodyguard_index]
+            uid = chosen.get("id") or chosen.get("unit_id")
+            if not uid:
+                return
+            uid = str(uid)
+
+            if uid in bodyguards:
+                bodyguards = [x for x in bodyguards if x != uid]
+                self.toast = f"{chosen.get('name', uid)} ya no es guardaespaldas."
+                self.toast_timer = 2.0
+            else:
+                if len(bodyguards) >= self.max_bodyguards:
+                    self.toast = f"Máximo {self.max_bodyguards} guardaespaldas."
+                    self.toast_timer = 2.0
+                    return
+                bodyguards.append(uid)
+                self.toast = f"{chosen.get('name', uid)} asignado como guardaespaldas."
+                self.toast_timer = 2.0
+
+            self.game.game_state.bodyguards = bodyguards
+            return
+
+        new_index = y * cols + x
+        if new_index < len(party):
+            self.bodyguard_index = new_index
+
+    def _render_bodyguards(self, screen):
+        w, h = screen.get_width(), screen.get_height()
+        box = pygame.Rect(24, 24, w - 48, h - 80)
+
+        pygame.draw.rect(screen, (10, 10, 10), box)
+        pygame.draw.rect(screen, (255, 255, 255), box, 2)
+
+        title = self.font.render("GUARDAESPALDAS", True, (255, 255, 255))
+        screen.blit(title, (box.x + 18, box.y + 14))
+
+        if not hasattr(self.game.game_state, "bodyguards"):
+            self.game.game_state.bodyguards = []
+
+        bodyguards = list(self.game.game_state.bodyguards or [])
+        party = list(self.game.game_state.party or [])
+
+        subtitle = self.small_font.render(
+            f"Elegí hasta {self.max_bodyguards}. En traición letal, sólo ellos combaten.",
+            True,
+            (200, 200, 200),
+        )
+        screen.blit(subtitle, (box.x + 18, box.y + 46))
+
+        if not party:
+            msg = self.font.render("No tenés reclutas todavía.", True, (255, 255, 255))
+            screen.blit(msg, (box.x + 18, box.y + 90))
+        else:
+            cols = self.army_cols
+            cell_w = (box.width - 36) // cols
+            cell_h = 60
+
+            start_x = box.x + 18
+            start_y = box.y + 80
+
+            for i, u in enumerate(party):
+                cx = i % cols
+                cy = i // cols
+                rect = pygame.Rect(
+                    start_x + cx * cell_w,
+                    start_y + cy * cell_h,
+                    cell_w - 10,
+                    cell_h - 10,
+                )
+
+                is_sel = (i == self.bodyguard_index)
+                pygame.draw.rect(screen, (35, 35, 35), rect)
+                pygame.draw.rect(screen, (255, 255, 255), rect, 2 if is_sel else 1)
+
+                uid = str(u.get("id") or u.get("unit_id") or "")
+                name = u.get("name", uid) if uid else u.get("name", "???")
+
+                marker = "★ " if uid and uid in bodyguards else "  "
+                label = self.small_font.render(marker + name, True, (255, 255, 255))
+                screen.blit(label, (rect.x + 10, rect.y + 10))
+
+                stats = self._resolve_stats(u)
+                hp = stats.get("hp", "-")
+                str_ = stats.get("str", stats.get("atk", "-"))
+                deff = stats.get("def", stats.get("defense", "-"))
+                mini = self.small_font.render(f"HP {hp} | STR {str_} | DEF {deff}", True, (200, 200, 200))
+                screen.blit(mini, (rect.x + 10, rect.y + 32))
+
+        if self.toast:
+            toast_surf = self.small_font.render(self.toast, True, (200, 255, 200))
+            screen.blit(toast_surf, (box.x + 18, box.bottom - 28))
+
+        hint = self.small_font.render("WASD mover  ENTER alternar  ESC volver", True, (200, 200, 200))
         screen.blit(hint, (24, h - 32))
