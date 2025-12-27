@@ -63,3 +63,73 @@ class MapData:
             markers[name] = (tx, ty)
 
         return markers
+    
+    def load_markers_static(self) -> list[dict]:
+        """
+        Carga markers estables desde objectgroup 'markers_static'.
+
+        Devuelve lista de dicts con:
+        {
+            "id": str,
+            "tile": (tx, ty),
+            "props": { ... }  # role, slot, facing, requires_flag, etc.
+        }
+
+        Importante: NO toca load_markers() (eventos).
+        """
+        out: list[dict] = []
+
+        for obj in self.get_objectgroup("markers_static"):
+            props = self.props_to_dict(obj)
+
+            marker_id = props.get("id")
+            if not marker_id:
+                continue
+
+            tx = int(obj["x"] // self.tile_size)
+            ty = int(obj["y"] // self.tile_size)
+
+            out.append(
+                {
+                    "id": str(marker_id),
+                    "tile": (tx, ty),
+                    "props": dict(props),
+                }
+            )
+
+        return out
+
+
+    def load_markers_static(self) -> list[dict]:
+        """
+        Carga markers estables desde objectgroup 'markers_static'.
+
+        Devuelve lista de dicts:
+        {
+            "id": str,
+            "tile": (tx, ty),
+            "props": dict   # role, slot, facing, requires_flag, etc.
+        }
+
+        Nota: NO modifica load_markers() (que queda para eventos).
+        """
+        out: list[dict] = []
+
+        for obj in self.get_objectgroup("markers_static"):
+            props = self.props_to_dict(obj)
+            marker_id = props.get("id")
+            if not marker_id:
+                continue
+
+            tx = int(obj["x"] // self.tile_size)
+            ty = int(obj["y"] // self.tile_size)
+
+            out.append(
+                {
+                    "id": str(marker_id),
+                    "tile": (tx, ty),
+                    "props": dict(props),
+                }
+            )
+
+        return out

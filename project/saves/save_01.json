@@ -2,8 +2,8 @@
   "version": 2,
   "current_map_id": "town_01",
   "player_tile": [
-    13,
-    13
+    14,
+    10
   ],
   "story_flags": {
     "intro_done": true

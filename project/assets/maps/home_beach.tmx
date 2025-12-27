@@ -70,6 +70,9 @@
   </object>
  </objectgroup>
  <objectgroup color="#ffff00" id="4" name="interactuable" tintcolor="#ffff00">
+  <properties>
+   <property name="dialogo" value="A la izquierda, reino de ulfrid, derecha ..."/>
+  </properties>
   <object id="27" x="334.051" y="52.1082" width="46.5252" height="44.6641">
    <properties>
     <property name="dialogo" value="Izquierda: &quot;Reino de Ulfrid&quot;, Derecha:&quot;Reino ...&quot;"/>

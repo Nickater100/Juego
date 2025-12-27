@@ -30,7 +30,7 @@
  <objectgroup color="#00aa00" id="3" name="puertas" tintcolor="#00aa00">
   <object id="31" x="343.561" y="316.076" width="49.6254" height="44.2811">
    <properties>
-    <property name="map" value="home"/>
+    <property name="map" value="maps/world/in_house.json"/>
    </properties>
   </object>
   <object id="32" x="342.797" y="-17.5598" width="51.9158" height="33.5926">

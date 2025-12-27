@@ -61,9 +61,16 @@ class AssignRolesSystem:
 
         npc_id = self.npcs[self.idx]
 
-        # persistir asignación
+        # Persistir asignación (runtime del evento)
         self.assignments_local[npc_id] = role
         self.ws._event_assignments[npc_id] = role
+
+        # ✅ Persistir asignación (save / estado estable)
+        # Esto es lo que habilita que el consejero aparezca en interiores por markers_static.
+        try:
+            self.ws.game.game_state.set_npc(str(npc_id), role=str(role))
+        except Exception:
+            pass
 
         # aplicar outcomes (delegado)
         self.ws._apply_role_outcomes_for_npc(npc_id)
@@ -74,6 +81,7 @@ class AssignRolesSystem:
 
         self.idx += 1
         self._show_prompt()
+
 
     # -------------------------
     # Internals
