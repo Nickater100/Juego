@@ -12,12 +12,14 @@ from core.config import TILE_SIZE
 
 class NPCSystem:
     """
-    Runtime NPCs (Units) + controllers + tasks (walk_to/despawn).
+    Runtime NPCs (Units) + controllers + tasks + helpers de interacción.
 
-    Mantiene:
-      - units: dict[npc_id] -> Unit
-      - controllers: dict[npc_id] -> MovementController
-      - tasks: dict[npc_id] -> {"type":"walk_to","target":(tx,ty),"despawn":bool}
+    Se encarga de:
+      - spawns runtime (Unit)
+      - update/draw runtime NPCs
+      - tasks walk_to + despawn + persistencia
+      - detectar NPC interactuable frente al player (map npc o runtime unit)
+      - aplicar outcomes de roles sobre runtime NPCs (move_to_marker, despawn, join_party)
     """
 
     def __init__(self, world_state, collision):
@@ -29,18 +31,46 @@ class NPCSystem:
         self.tasks: dict[str, dict] = {}
 
     # -------------------------
+    # Map NPC data helpers
+    # -------------------------
+    def filter_map_npcs(self, map_npcs: list[dict]) -> list[dict]:
+        """Filtra NPCs del mapa según flags/persistencia."""
+        out = []
+        for n in map_npcs or []:
+            npc_id = n.get("id", "")
+            if npc_id and self.ws.game.game_state.get_flag(f"recruited:{npc_id}", False):
+                continue
+            out.append(n)
+        return out
+
+    def get_interactable_at_tile(self, tx: int, ty: int, map_npcs: list[dict]):
+        """
+        Devuelve:
+          (npc_id, npc_data, source)
+        donde source es "map" o "runtime".
+        """
+        # 1) map npc data
+        for n in map_npcs or []:
+            if n.get("tile_x") == tx and n.get("tile_y") == ty:
+                return n.get("id"), n, "map"
+
+        # 2) runtime units
+        for uid, u in self.units.items():
+            if getattr(u, "tile_x", None) == tx and getattr(u, "tile_y", None) == ty:
+                return uid, None, "runtime"
+
+        return None, None, None
+
+    # -------------------------
     # Update / Render
     # -------------------------
     def update(self, dt: float) -> None:
-        # controllers
         for ctrl in self.controllers.values():
             ctrl.update(dt)
 
-        # sprites
         for u in self.units.values():
             u.update_sprite(dt)
 
-        # tasks
         self._update_tasks(dt)
 
     def draw(self, screen, camera) -> None:
@@ -51,13 +81,9 @@ class NPCSystem:
     # Spawning
     # -------------------------
     def spawn_unit(self, npc_id: str, tx: int, ty: int) -> None:
-        """
-        Spawnea un Unit para el NPC (runtime) y le setea sprite personalizado si existe.
-        """
         if npc_id in self.units:
             return
 
-        # Cargar sprite personalizado si existe
         npc_json_path = asset_path("sprites", "npcs", npc_id, f"{npc_id}.json")
         walk_path = None
         if os.path.exists(npc_json_path):
@@ -82,10 +108,6 @@ class NPCSystem:
         self.controllers[npc_id] = MovementController(u, self.collision)
 
     def spawn_intro_line(self, markers: dict, player_tile: tuple[int, int]) -> None:
-        """
-        Spawnea Marian + 4 NPCs del intro en línea usando markers.
-        Mantiene exactamente la lógica que venías usando.
-        """
         ids = ["selma_ironrose", "loren_valcrest", "iraen_falk", "elinya_brightwell"]
         line_markers = ["line_1", "line_2", "line_3", "line_4"]
 
@@ -131,24 +153,15 @@ class NPCSystem:
 
             tx, ty = task["target"]
 
-            # Llegó
             if unit.tile_x == tx and unit.tile_y == ty:
                 if task.get("despawn"):
                     self.remove(npc_id)
-
-                    # Persistencia (igual que antes)
-                    self.ws.game.game_state.set_npc(
-                        npc_id,
-                        active=False,
-                        map=None,
-                        tile=None
-                    )
+                    self.ws.game.game_state.set_npc(npc_id, active=False, map=None, tile=None)
                 continue
 
             if unit.is_moving:
                 continue
 
-            # Step simple hacia el target (igual que antes)
             dx = 0
             dy = 0
             if unit.tile_x < tx:
@@ -162,3 +175,34 @@ class NPCSystem:
 
             if dx != 0 or dy != 0:
                 ctrl.try_move(dx, dy)
+
+    # -------------------------
+    # Role outcomes (declarativo)
+    # -------------------------
+    def apply_role_outcomes(self, npc_id: str, cfg: dict, markers: dict) -> None:
+        """
+        Aplica outcomes de un rol sobre un runtime npc_id.
+
+        cfg soporta:
+          - move_to_marker: str
+          - despawn_on_arrival: bool
+          - effects: list[{type: "..."}]
+        """
+        if npc_id not in self.units:
+            return
+
+        marker_id = cfg.get("move_to_marker")
+        if marker_id:
+            target = markers.get(marker_id)
+            if target:
+                despawn = bool(cfg.get("despawn_on_arrival", False))
+                self.set_walk_to(npc_id, target, despawn)
+
+        for eff in cfg.get("effects", []) or []:
+            if eff.get("type") == "join_party":
+                self.ws.game.game_state.add_party_member(
+                    npc_id,
+                    name=npc_id.replace("_", " ").title()
+                )
+                self.remove(npc_id)
+                self.ws.game.game_state.set_npc(npc_id, active=False, map=None, tile=None)
