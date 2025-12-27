@@ -4,16 +4,17 @@ from engines.world_engine.map_loader import TiledMap
 from engines.world_engine.collision import CollisionSystem
 from engines.world_engine.dialogue_system import DialogueSystem
 from engines.world_engine.npc_system import NPCSystem
+from engines.world_engine.world_interaction_system import WorldInteractionSystem
 from engines.world_engine.npc_controller import MovementController
+from engines.world_engine.event_runner import EventRunner
 
 from core.entities.unit import Unit
-import pygame
 from core.config import TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT
 from render.world.camera import Camera
 from core.assets import asset_path
-import json
 
-from engines.world_engine.event_runner import EventRunner
+import pygame
+import json
 
 
 class WorldState:
@@ -27,7 +28,7 @@ class WorldState:
 
         self.map = TiledMap(json_path=json_path, assets_root=asset_path(""))
 
-        # caches
+        # caches JSON map
         self._map_json_cache = None
         self._objectgroups_cache = {}
 
@@ -35,18 +36,14 @@ class WorldState:
         self.doors = self._get_objectgroup("puertas")
         self.triggers = self._get_objectgroup("triggers")
 
-        self._trigger_fired = set()
-
-        # puertas anti-loop
-        self._door_was_inside = False
-        self._door_cooldown = 0.0
-        self._door_lock_until_exit = False
-        self._door_lock_rect = None
-
+        # input lock global (eventos/diálogo)
         self.input_locked = False
 
         # collision + camera
-        self.collision = CollisionSystem(self.map, get_npc_units=lambda: self.npc_system.units if hasattr(self, "npc_system") else {})
+        self.collision = CollisionSystem(
+            self.map,
+            get_npc_units=lambda: self.npc_system.units if hasattr(self, "npc_system") else {}
+        )
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         # spawn player
@@ -59,20 +56,22 @@ class WorldState:
         self.player = Unit(tile_x=px, tile_y=py)
         self.controller = MovementController(self.player, self.collision)
 
+        # input movimiento
         self.move_dir = None
         self.move_timer = 0
 
         # systems
         self.dialogue = DialogueSystem(self)
         self.npc_system = NPCSystem(self, self.collision)
+        self.interactions = WorldInteractionSystem(self, doors=self.doors, triggers=self.triggers)
 
-        # filtrar NPCs “data” del mapa usando NPCSystem (✅ WorldState ya no sabe flags de recruited)
+        # filtrar NPCs del mapa (data)
         self.map.npcs = self.npc_system.filter_map_npcs(getattr(self.map, "npcs", []) or [])
 
-        # events
+        # eventos
         self.event_runner = EventRunner(self)
 
-        # roles/assignments
+        # roles/assignments (UI)
         self._event_assignments = {}
         self._event_apply_role_outcomes_step = None
 
@@ -84,6 +83,7 @@ class WorldState:
         self._assign_idx = 0
         self._assignments_local = {}
 
+        # autoplay intro
         if not self.game.game_state.get_flag("intro_done", False):
             self.start_intro_event()
 
@@ -132,6 +132,7 @@ class WorldState:
     # Update
     # -------------------------------
     def update(self, dt):
+        # player
         self.controller.update(dt)
         self.player.update_sprite(dt)
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
@@ -141,71 +142,37 @@ class WorldState:
         else:
             self.move_timer = 0
 
+        # NPCs runtime
         self.npc_system.update(dt)
 
-        if self._door_cooldown > 0:
-            self._door_cooldown -= dt
-            if self._door_cooldown < 0:
-                self._door_cooldown = 0
+        # puertas/triggers (si cambia de mapa, esto ya retorna True internamente y el WorldState del juego cambia)
+        self.interactions.update(dt)
 
-        # anti-rebote spawn puerta
-        skip_doors = False
-        if self._door_lock_until_exit and self._door_lock_rect:
-            player_rect = pygame.Rect(self.player.pixel_x, self.player.pixel_y, TILE_SIZE, TILE_SIZE)
-            if player_rect.colliderect(self._door_lock_rect):
-                self._door_was_inside = True
-                skip_doors = True
-            else:
-                self._door_lock_until_exit = False
-                self._door_lock_rect = None
-                self._door_was_inside = False
-
-        # puertas
-        if (not skip_doors) and (not self.input_locked) and (not self.player.is_moving) and self._door_cooldown == 0:
-            player_rect = pygame.Rect(self.player.pixel_x, self.player.pixel_y, TILE_SIZE, TILE_SIZE)
-            inside_any = False
-            door_hit = None
-
-            for obj in self.doors:
-                door_rect = pygame.Rect(obj["x"], obj["y"], obj["width"], obj["height"])
-                if player_rect.colliderect(door_rect):
-                    inside_any = True
-                    door_hit = obj
-                    break
-
-            if inside_any and not self._door_was_inside and door_hit:
-                props = self._props_to_dict(door_hit)
-                destino = props.get("map") or props.get("target_map")
-                if destino:
-                    self.cambiar_mapa(destino, puerta_entrada=door_hit)
-                    self._door_cooldown = 0.25
-                    return
-
-            self._door_was_inside = inside_any
-
-        if not self.input_locked:
-            self._check_triggers()
-
+        # guardar tile
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
 
-        if getattr(self, "event_runner", None):
-            self.event_runner.update(dt)
+        # eventos
+        self.event_runner.update(dt)
 
     # -------------------------------
-    # Interacción
+    # Interacción (hablar)
     # -------------------------------
     def try_interact(self):
         dx, dy = self.player.facing
         tx = self.player.tile_x + dx
         ty = self.player.tile_y + dy
 
-        npc_id, npc_data, source = self.npc_system.get_interactable_at_tile(tx, ty, getattr(self.map, "npcs", []) or [])
+        npc_id, npc_data, source = self.npc_system.get_interactable_at_tile(
+            tx, ty, getattr(self.map, "npcs", []) or []
+        )
         if not npc_id:
             return
 
+        # si el evento consume la interacción
         if self.event_runner.active and self.event_runner.on_player_interact(npc_id):
             return
 
+        # diálogo normal
         if source == "map" and npc_data:
             self.open_dialogue(
                 npc_data.get("name", ""),
@@ -251,26 +218,6 @@ class WorldState:
             options=[{"text": "Salir", "action": "close"}],
             context={}
         )
-
-    # -------------------------------
-    # Triggers
-    # -------------------------------
-    def _check_triggers(self):
-        player_rect = pygame.Rect(self.player.pixel_x, self.player.pixel_y, TILE_SIZE, TILE_SIZE)
-        for obj in self.triggers:
-            obj_id = obj.get("id") or obj.get("name") or f'{obj.get("x")}:{obj.get("y")}'
-            if obj_id in self._trigger_fired:
-                continue
-            rect = pygame.Rect(obj["x"], obj["y"], obj["width"], obj["height"])
-            if not player_rect.colliderect(rect):
-                continue
-            props = self._props_to_dict(obj)
-            event_id = props.get("event_id")
-            once = bool(props.get("once", True))
-            if event_id:
-                pass
-            if once:
-                self._trigger_fired.add(obj_id)
 
     # -------------------------------
     # Assign Roles UI
@@ -375,7 +322,7 @@ class WorldState:
         self.event_runner.start(event_json)
 
     # -------------------------------
-    # Role outcomes (delegado)
+    # Role outcomes (delegado a NPCSystem)
     # -------------------------------
     def _apply_role_outcomes_for_npc(self, npc_id: str) -> None:
         step = getattr(self, "_event_apply_role_outcomes_step", None)
@@ -391,7 +338,7 @@ class WorldState:
         self.npc_system.apply_role_outcomes(npc_id, cfg, self.markers)
 
     # -------------------------------
-    # Map switch / JSON helpers / Render (igual que antes)
+    # Cambiar mapa (setea lock puerta en InteractionSystem)
     # -------------------------------
     def cambiar_mapa(self, destino, puerta_entrada=None):
         destino_path = asset_path(destino)
@@ -407,7 +354,7 @@ class WorldState:
 
         if not puertas_destino:
             nuevo = WorldState(self.game, map_rel_path=destino, spawn_tile=(0, 0))
-            nuevo._door_cooldown = 0.4
+            nuevo.interactions.set_cooldown(0.4)
             self.game.change_state(nuevo)
             return
 
@@ -446,19 +393,18 @@ class WorldState:
         nuevo = WorldState(self.game, map_rel_path=destino, spawn_tile=(tx, ty))
 
         if puerta_destino is not None:
-            nuevo._door_lock_until_exit = True
-            nuevo._door_lock_rect = pygame.Rect(
-                puerta_destino["x"], puerta_destino["y"],
-                puerta_destino["width"], puerta_destino["height"]
+            nuevo.interactions.set_spawn_door_lock(
+                pygame.Rect(puerta_destino["x"], puerta_destino["y"], puerta_destino["width"], puerta_destino["height"]),
+                cooldown=0.15
             )
-            nuevo._door_cooldown = 0.15
-            nuevo._door_was_inside = True
         else:
-            nuevo._door_cooldown = 0.4
-            nuevo._door_was_inside = True
+            nuevo.interactions.set_cooldown(0.4)
 
         self.game.change_state(nuevo)
 
+    # -------------------------------
+    # Map JSON helpers
+    # -------------------------------
     def _load_map_json(self):
         if self._map_json_cache is None:
             with open(self.map.json_path, "r", encoding="utf-8") as f:
@@ -500,6 +446,9 @@ class WorldState:
             markers[name] = (tx, ty)
         return markers
 
+    # -------------------------------
+    # Render
+    # -------------------------------
     def render(self, screen):
         screen.fill((0, 0, 0))
 
@@ -508,6 +457,7 @@ class WorldState:
 
         self.npc_system.draw(screen, self.camera)
 
+        # map NPC placeholders (si los seguís usando)
         for n in getattr(self.map, "npcs", []) or []:
             nx = n["tile_x"] * TILE_SIZE - self.camera.x
             ny = n["tile_y"] * TILE_SIZE - self.camera.y
