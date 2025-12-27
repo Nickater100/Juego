@@ -128,7 +128,7 @@ class DialogueSystem:
         # assign_roles
         if isinstance(action, str) and action.startswith("assign_role:"):
             role = action.split(":", 1)[1]
-            self.ws._assign_current_npc(role)
+            self.ws.assign_role(role)
             return
 
         # close

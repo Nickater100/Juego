@@ -26,9 +26,9 @@ class EventRunner:
     Requisitos en WorldState:
       - ws.input_locked: bool
       - ws.open_dialogue(speaker, lines, options=None, context=None)
-      - ws._start_assign_roles(step_dict)
+      - ws.start_assign_roles(step_dict)   ✅ (Paso 5)
       - ws.game.game_state.get_flag / set_flag
-      - ws._event_assignments (dict) usado por tu UI de roles
+      - ws._event_assignments (dict)
     """
 
     def __init__(self, ws: Any):
@@ -107,11 +107,9 @@ class EventRunner:
             trigger = (step.get("trigger") or "auto").lower()
 
             if trigger == "talk":
-                # armamos el bloque (talks consecutivos)
                 self._enter_talk_block()
                 return
 
-            # auto: consumir y ejecutar
             self._idx += 1
             self._exec_step(step)
 
@@ -128,11 +126,9 @@ class EventRunner:
             if npc_id:
                 self._talk_pending[str(npc_id)] = step
 
-            # consumimos el step del stream (queda pendiente en el bloque)
             self._idx += 1
 
         if not self._talk_pending:
-            # no había talks válidos, seguimos
             return
 
         self.ws.input_locked = False
@@ -142,11 +138,6 @@ class EventRunner:
     # Hooks desde WorldState
     # -------------------------
     def on_player_interact(self, npc_id: str) -> bool:
-        """
-        Si estamos en talk_block y el npc_id está pendiente:
-          - ejecuta el diálogo del evento
-          - programa los pasos post (si existen) para correr al cerrar el diálogo
-        """
         if not self.active:
             return False
         if not self._waiting or self._waiting.kind != "talk_block":
@@ -174,10 +165,6 @@ class EventRunner:
         return True
 
     def on_dialogue_closed(self) -> None:
-        """
-        Llamar cuando se cierra un diálogo que abrió el runner.
-        Ejecuta post-steps si hay, si no vuelve al talk_block o continúa el evento.
-        """
         if not self.active:
             return
 
@@ -201,11 +188,6 @@ class EventRunner:
             self.advance()
 
     def on_assign_roles_done(self, assignments: Dict[str, str]) -> None:
-        """
-        Llamar cuando termina el UI de assign_roles.
-        Si hay post_queue restante, seguir ejecutándola.
-        Si no, volver al talk_block (si quedan) o continuar.
-        """
         if not self.active:
             return
 
@@ -227,7 +209,7 @@ class EventRunner:
                 self._exec_step(next_step)
                 return
 
-            # 2) Si estamos todavía en un talk_block (quedan NPCs por hablar), volver a soltar input
+            # 2) Si quedan NPCs por hablar en el talk_block, soltar input
             if self._talk_pending:
                 self.ws.input_locked = False
                 self._waiting = Waiting(kind="talk_block")
@@ -247,7 +229,7 @@ class EventRunner:
         self.active = False
         self._waiting = None
         self._talk_pending = {}
-        self._post_queue = {}
+        self._post_queue = []   # ✅ FIX: era {} y rompía
         self._ctx = {}
         self.ws.input_locked = False
 
@@ -260,8 +242,6 @@ class EventRunner:
         if t == "dialogue":
             speaker = step.get("speaker", "")
             lines = step.get("lines", []) or []
-
-            # (por si en el futuro querés opciones en diálogos de evento)
             options = step.get("options") or step.get("choices") or None
 
             self.ws.open_dialogue(
@@ -277,8 +257,8 @@ class EventRunner:
             return
 
         if t == "assign_roles":
-            # ✅ soporte npc_from:"last_talk"
-            step = dict(step)  # copia segura (no muta el JSON original)
+            # soporte npc_from:"last_talk"
+            step = dict(step)
             npc_from = step.get("npc_from")
 
             if npc_from == "last_talk":
@@ -286,10 +266,12 @@ class EventRunner:
                 if npc_id:
                     step["npcs"] = [npc_id]
                 else:
-                    # si no hay last_talk, no hacemos nada (evento mal armado)
                     return
 
-            self.ws._start_assign_roles(step)
+            # ✅ Paso 5: delegar al AssignRolesSystem del WorldState
+            # antes: self.ws._start_assign_roles(step)
+            self.ws.start_assign_roles(step)
+
             self._waiting = Waiting(kind="assign_roles")
             return
 
@@ -325,14 +307,21 @@ class EventRunner:
                 if not target:
                     continue
 
-                if npc_id in getattr(self.ws, "npc_units", {}):
-                    u = self.ws.npc_units[npc_id]
-                    u.tile_x, u.tile_y = target
-                    u.pixel_x = target[0] * self._tile_size()
-                    u.pixel_y = target[1] * self._tile_size()
+                # ✅ FIX: ahora los runtime NPCs viven en ws.npc_system.units
+                unit = getattr(self.ws, "npc_system", None)
+                if not unit:
+                    continue
+
+                u = self.ws.npc_system.units.get(npc_id)
+                if not u:
+                    continue
+
+                u.tile_x, u.tile_y = target
+                u.pixel_x = target[0] * self._tile_size()
+                u.pixel_y = target[1] * self._tile_size()
+
             return
 
-        # Step desconocido -> ignorar
         return
 
     def _tile_size(self) -> int:

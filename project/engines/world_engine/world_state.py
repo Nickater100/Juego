@@ -7,6 +7,7 @@ from engines.world_engine.npc_system import NPCSystem
 from engines.world_engine.world_interaction_system import WorldInteractionSystem
 from engines.world_engine.map_data import MapData
 from engines.world_engine.map_transition_system import MapTransitionSystem
+from engines.world_engine.assign_roles_system import AssignRolesSystem
 from engines.world_engine.npc_controller import MovementController
 from engines.world_engine.event_runner import EventRunner
 
@@ -30,14 +31,13 @@ class WorldState:
 
         self.map = TiledMap(json_path=json_path, assets_root=asset_path(""))
 
-        # Map data/cache helpers (✅ fuera de WorldState)
+        # Map data/cache helpers
         self.map_data = MapData(self.map.json_path, tile_size=TILE_SIZE)
 
         self.markers = self.map_data.load_markers()
         self.doors = self.map_data.get_objectgroup("puertas")
         self.triggers = self.map_data.get_objectgroup("triggers")
 
-        # input lock global (eventos/diálogo)
         self.input_locked = False
 
         # collision + camera
@@ -66,6 +66,7 @@ class WorldState:
         self.npc_system = NPCSystem(self, self.collision)
         self.interactions = WorldInteractionSystem(self, doors=self.doors, triggers=self.triggers)
         self.transitions = MapTransitionSystem(self)
+        self.assign_roles = AssignRolesSystem(self)
 
         # filtrar NPCs del mapa (data)
         self.map.npcs = self.npc_system.filter_map_npcs(getattr(self.map, "npcs", []) or [])
@@ -73,24 +74,15 @@ class WorldState:
         # eventos
         self.event_runner = EventRunner(self)
 
-        # roles/assignments (UI)
+        # assignments / outcomes step (el runner lo setea)
         self._event_assignments = {}
         self._event_apply_role_outcomes_step = None
 
-        self._assign_active = False
-        self._assign_step = None
-        self._assign_npcs = []
-        self._assign_roles = []
-        self._assign_remaining = {}
-        self._assign_idx = 0
-        self._assignments_local = {}
-
-        # autoplay intro
         if not self.game.game_state.get_flag("intro_done", False):
             self.start_intro_event()
 
     # --------------------------------
-    # Compat: usado por WorldInteractionSystem y MapTransitionSystem
+    # Compat: usado por Interaction/Transition systems
     # --------------------------------
     def _props_to_dict(self, obj) -> dict:
         return self.map_data.props_to_dict(obj)
@@ -140,7 +132,6 @@ class WorldState:
     # Update
     # -------------------------------
     def update(self, dt):
-        # player
         self.controller.update(dt)
         self.player.update_sprite(dt)
         self.camera.follow(self.player.pixel_x, self.player.pixel_y)
@@ -150,16 +141,11 @@ class WorldState:
         else:
             self.move_timer = 0
 
-        # NPCs runtime
         self.npc_system.update(dt)
-
-        # puertas/triggers
         self.interactions.update(dt)
 
-        # guardar tile
         self.game.game_state.set_player_tile(self.player.tile_x, self.player.tile_y)
 
-        # eventos
         self.event_runner.update(dt)
 
     # -------------------------------
@@ -226,78 +212,29 @@ class WorldState:
         )
 
     # -------------------------------
-    # Assign Roles UI
+    # Assign Roles hooks (llamados por EventRunner + DialogueSystem)
     # -------------------------------
-    def _start_assign_roles(self, step: dict) -> None:
-        self._assign_step = step
-        self._assign_active = True
-        self._assign_npcs = list(step.get("npcs", []))
-        self._assign_roles = list(step.get("roles", []))
-        constraints = step.get("constraints", {}) or {}
+    def start_assign_roles(self, step: dict) -> None:
+        self.assign_roles.start(step)
 
-        self._assign_remaining = {r: int(constraints.get(r, 1)) for r in self._assign_roles}
+    def assign_role(self, role: str) -> None:
+        self.assign_roles.assign(role)
 
-        already = dict(getattr(self, "_event_assignments", {}) or {})
-        for _npc_id, role in already.items():
-            if role in self._assign_remaining:
-                self._assign_remaining[role] -= 1
-
-        for r in list(self._assign_remaining.keys()):
-            if self._assign_remaining[r] < 0:
-                self._assign_remaining[r] = 0
-
-        self._assign_idx = 0
-        self._assignments_local = {}
-        self._show_assign_prompt()
-
-    def _assign_current_npc(self, role: str) -> None:
-        if not self._assign_active:
-            return
-        if self._assign_idx >= len(self._assign_npcs):
+    # -------------------------------
+    # Role outcomes (delegado a NPCSystem)
+    # -------------------------------
+    def _apply_role_outcomes_for_npc(self, npc_id: str) -> None:
+        step = getattr(self, "_event_apply_role_outcomes_step", None)
+        if not step:
             return
 
-        npc_id = self._assign_npcs[self._assign_idx]
-        self._assignments_local[npc_id] = role
-        self._event_assignments[npc_id] = role
-
-        self._apply_role_outcomes_for_npc(npc_id)
-
-        if role in self._assign_remaining and self._assign_remaining[role] > 0:
-            self._assign_remaining[role] -= 1
-
-        self._assign_idx += 1
-        self._show_assign_prompt()
-
-    def _show_assign_prompt(self) -> None:
-        if self._assign_idx >= len(self._assign_npcs):
-            self._event_assignments.update(self._assignments_local)
-            self._assign_active = False
-            if self.dialogue.active:
-                self.dialogue.close()
-            if self.event_runner.active:
-                self.event_runner.on_assign_roles_done(self._event_assignments)
+        role = self._event_assignments.get(npc_id)
+        if not role:
             return
 
-        npc_id = self._assign_npcs[self._assign_idx]
-
-        remaining_bits = [f"{r}: {max(0, int(self._assign_remaining.get(r, 0)))}" for r in self._assign_roles]
-        remaining_txt = ", ".join(remaining_bits)
-
-        prompt_lines = [
-            f"Asigná un rol para: {npc_id}",
-            f"Pendientes -> {remaining_txt}"
-        ]
-
-        options = [{"text": r, "action": f"assign_role:{r}"} for r in self._assign_roles if self._assign_remaining.get(r, 0) > 0]
-        if not options:
-            options = [{"text": r, "action": f"assign_role:{r}"} for r in self._assign_roles]
-
-        self.open_dialogue(
-            "Asignación de roles",
-            prompt_lines,
-            options=options,
-            context={"event": "assign_roles"}
-        )
+        roles_cfg = step.get("roles", {}) or {}
+        cfg = roles_cfg.get(role, {}) or {}
+        self.npc_system.apply_role_outcomes(npc_id, cfg, self.markers)
 
     # -------------------------------
     # Intro / eventos
@@ -328,23 +265,7 @@ class WorldState:
         self.event_runner.start(event_json)
 
     # -------------------------------
-    # Role outcomes (delegado a NPCSystem)
-    # -------------------------------
-    def _apply_role_outcomes_for_npc(self, npc_id: str) -> None:
-        step = getattr(self, "_event_apply_role_outcomes_step", None)
-        if not step:
-            return
-
-        role = self._event_assignments.get(npc_id)
-        if not role:
-            return
-
-        roles_cfg = step.get("roles", {}) or {}
-        cfg = roles_cfg.get(role, {}) or {}
-        self.npc_system.apply_role_outcomes(npc_id, cfg, self.markers)
-
-    # -------------------------------
-    # Cambiar mapa (delegado a TransitionSystem)
+    # Cambiar mapa (delegado)
     # -------------------------------
     def cambiar_mapa(self, destino, puerta_entrada=None):
         self.transitions.change_map(destino, puerta_entrada=puerta_entrada)
@@ -360,7 +281,6 @@ class WorldState:
 
         self.npc_system.draw(screen, self.camera)
 
-        # map NPC placeholders (si los seguís usando)
         for n in getattr(self.map, "npcs", []) or []:
             nx = n["tile_x"] * TILE_SIZE - self.camera.x
             ny = n["tile_y"] * TILE_SIZE - self.camera.y
