@@ -78,7 +78,7 @@
   <object id="19" x="264.263" y="305.205">
    <point/>
   </object>
-  <object id="25" x="455.946" y="302.413">
+  <object id="25" x="267.054" y="413.143">
    <properties>
     <property name="facing" value="down"/>
     <property name="id" value="advisor_spot"/>
