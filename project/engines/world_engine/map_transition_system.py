@@ -32,6 +32,12 @@ class MapTransitionSystem:
 
         # si el mapa destino no tiene puertas, spawn 0,0
         if not puertas_destino:
+            # ✅ actualizar mapa actual en gamestate
+            try:
+                self.ws.game.game_state.current_map_id = destino
+            except Exception:
+                pass
+
             nuevo = type(self.ws)(self.ws.game, map_rel_path=destino, spawn_tile=(0, 0))
             nuevo.interactions.set_cooldown(0.4)
             self.ws.game.change_state(nuevo)
@@ -71,6 +77,12 @@ class MapTransitionSystem:
 
             tx = int((puerta_destino["x"] + puerta_destino["width"] / 2) // TILE_SIZE)
             ty = int((puerta_destino["y"] + puerta_destino["height"] / 2) // TILE_SIZE)
+
+        # ✅ actualizar mapa actual en gamestate ANTES de crear el nuevo state
+        try:
+            self.ws.game.game_state.current_map_id = destino
+        except Exception:
+            pass
 
         # crear nuevo state
         nuevo = type(self.ws)(self.ws.game, map_rel_path=destino, spawn_tile=(tx, ty))

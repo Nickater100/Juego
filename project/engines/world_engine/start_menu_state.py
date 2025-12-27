@@ -89,8 +89,20 @@ class StartMenuState:
 
                 self.game.game_state = loaded
 
+                # ✅ resolver mapa guardado (compat: saves viejos con "town_01")
+                map_id = getattr(self.game.game_state, "current_map_id", "maps/world/town_01.json")
+                if isinstance(map_id, str):
+                    map_str = map_id
+                    if "/" not in map_str and not map_str.endswith(".json"):
+                        map_str = f"maps/world/{map_str}.json"
+                else:
+                    map_str = "maps/world/town_01.json"
+
+                # ✅ usar también la posición guardada
+                spawn = self.game.game_state.get_player_tile()
+
                 from engines.world_engine.world_state import WorldState
-                self.game.change_state(WorldState(self.game))
+                self.game.change_state(WorldState(self.game, map_rel_path=map_str, spawn_tile=spawn))
                 return
 
             # -----------------------------

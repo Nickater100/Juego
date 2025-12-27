@@ -26,6 +26,16 @@ class WorldState:
 
         self.game = game
 
+        # ✅ Guardar mapa actual EXACTAMENTE como llega (string o tuple/list)
+        # Esto evita romper tu lógica actual y permite reabrir el mapa correcto al cargar.
+        try:
+            if isinstance(map_rel_path, (tuple, list)):
+                self.game.game_state.current_map_id = tuple(map_rel_path)
+            else:
+                self.game.game_state.current_map_id = str(map_rel_path)
+        except Exception:
+            pass
+
         if isinstance(map_rel_path, (tuple, list)):
             json_path = asset_path(*map_rel_path)
         else:
@@ -71,9 +81,8 @@ class WorldState:
         self.assign_roles = AssignRolesSystem(self)
 
         self.map.npcs = self.npc_system.filter_map_npcs(getattr(self.map, "npcs", []) or [])
-        print("[DEBUG] game_state.npcs:", self.game.game_state.npcs)
-        print("[DEBUG] game_state.story_flags:", self.game.game_state.story_flags)
-        print("[DEBUG] markers_static:", self.markers_static)
+
+        # ✅ placements estables (advisor, etc.)
         self._apply_static_role_placements()
 
         self.event_runner = EventRunner(self)
@@ -93,17 +102,13 @@ class WorldState:
         self._bodyguard_runtime_ids = []
         self._last_player_tile = (self.player.tile_x, self.player.tile_y)
 
-        # Cola de posiciones previas del player (para "lag" suave)
-        # Mientras más larga, más estable cuando el player camina seguido.
         self._follow_history = deque(maxlen=32)
         self._follow_history.appendleft(self._last_player_tile)
 
-        # Ajustes de comportamiento
-        self._follow_min_gap = 1          # cada guardaespaldas toma un tile distinto de atraso
-        self._follow_snap_distance = 10   # si se desincronizan mucho, recién ahí corrige
+        self._follow_min_gap = 1
+        self._follow_snap_distance = 10
 
         self.sync_bodyguards()
-
 
         # --------------------------------
         # Compat: usado por Interaction/Transition systems

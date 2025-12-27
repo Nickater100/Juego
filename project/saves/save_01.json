@@ -1,39 +1,31 @@
 {
   "version": 2,
-  "current_map_id": "town_01",
+  "current_map_id": "maps/world/in_house.json",
   "player_tile": [
-    11,
-    13
+    16,
+    5
   ],
   "story_flags": {
-    "intro_done": true
+    "intro_done": true,
+    "advisor_chosen": true
   },
   "party": [
     {
-      "id": "elinya_brightwell",
-      "name": "Elinya Brightwell"
-    },
-    {
       "id": "loren_valcrest",
       "name": "Loren Valcrest"
+    },
+    {
+      "id": "elinya_brightwell",
+      "name": "Elinya Brightwell"
     }
   ],
-  "bodyguards": [],
+  "bodyguards": [
+    "loren_valcrest",
+    "elinya_brightwell"
+  ],
   "npcs": {
     "marian_vell": {
       "role": "advisor",
-      "active": false,
-      "map": null,
-      "tile": null
-    },
-    "elinya_brightwell": {
-      "role": "soldier",
-      "active": false,
-      "map": null,
-      "tile": null
-    },
-    "iraen_falk": {
-      "role": "inn",
       "active": false,
       "map": null,
       "tile": null
@@ -46,6 +38,18 @@
     },
     "selma_ironrose": {
       "role": "weapon_shop",
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "iraen_falk": {
+      "role": "inn",
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "elinya_brightwell": {
+      "role": "soldier",
       "active": false,
       "map": null,
       "tile": null
