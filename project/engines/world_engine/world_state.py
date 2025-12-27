@@ -5,6 +5,8 @@ from engines.world_engine.collision import CollisionSystem
 from engines.world_engine.dialogue_system import DialogueSystem
 from engines.world_engine.npc_system import NPCSystem
 from engines.world_engine.world_interaction_system import WorldInteractionSystem
+from engines.world_engine.map_data import MapData
+from engines.world_engine.map_transition_system import MapTransitionSystem
 from engines.world_engine.npc_controller import MovementController
 from engines.world_engine.event_runner import EventRunner
 
@@ -28,13 +30,12 @@ class WorldState:
 
         self.map = TiledMap(json_path=json_path, assets_root=asset_path(""))
 
-        # caches JSON map
-        self._map_json_cache = None
-        self._objectgroups_cache = {}
+        # Map data/cache helpers (✅ fuera de WorldState)
+        self.map_data = MapData(self.map.json_path, tile_size=TILE_SIZE)
 
-        self.markers = self._load_markers()
-        self.doors = self._get_objectgroup("puertas")
-        self.triggers = self._get_objectgroup("triggers")
+        self.markers = self.map_data.load_markers()
+        self.doors = self.map_data.get_objectgroup("puertas")
+        self.triggers = self.map_data.get_objectgroup("triggers")
 
         # input lock global (eventos/diálogo)
         self.input_locked = False
@@ -64,6 +65,7 @@ class WorldState:
         self.dialogue = DialogueSystem(self)
         self.npc_system = NPCSystem(self, self.collision)
         self.interactions = WorldInteractionSystem(self, doors=self.doors, triggers=self.triggers)
+        self.transitions = MapTransitionSystem(self)
 
         # filtrar NPCs del mapa (data)
         self.map.npcs = self.npc_system.filter_map_npcs(getattr(self.map, "npcs", []) or [])
@@ -86,6 +88,12 @@ class WorldState:
         # autoplay intro
         if not self.game.game_state.get_flag("intro_done", False):
             self.start_intro_event()
+
+    # --------------------------------
+    # Compat: usado por WorldInteractionSystem y MapTransitionSystem
+    # --------------------------------
+    def _props_to_dict(self, obj) -> dict:
+        return self.map_data.props_to_dict(obj)
 
     # -------------------------------
     # Input
@@ -145,7 +153,7 @@ class WorldState:
         # NPCs runtime
         self.npc_system.update(dt)
 
-        # puertas/triggers (si cambia de mapa, esto ya retorna True internamente y el WorldState del juego cambia)
+        # puertas/triggers
         self.interactions.update(dt)
 
         # guardar tile
@@ -168,11 +176,9 @@ class WorldState:
         if not npc_id:
             return
 
-        # si el evento consume la interacción
         if self.event_runner.active and self.event_runner.on_player_interact(npc_id):
             return
 
-        # diálogo normal
         if source == "map" and npc_data:
             self.open_dialogue(
                 npc_data.get("name", ""),
@@ -338,113 +344,10 @@ class WorldState:
         self.npc_system.apply_role_outcomes(npc_id, cfg, self.markers)
 
     # -------------------------------
-    # Cambiar mapa (setea lock puerta en InteractionSystem)
+    # Cambiar mapa (delegado a TransitionSystem)
     # -------------------------------
     def cambiar_mapa(self, destino, puerta_entrada=None):
-        destino_path = asset_path(destino)
-
-        with open(destino_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        puertas_destino = []
-        for layer in data.get("layers", []):
-            if layer.get("type") == "objectgroup" and layer.get("name") == "puertas":
-                puertas_destino = layer.get("objects", [])
-                break
-
-        if not puertas_destino:
-            nuevo = WorldState(self.game, map_rel_path=destino, spawn_tile=(0, 0))
-            nuevo.interactions.set_cooldown(0.4)
-            self.game.change_state(nuevo)
-            return
-
-        puerta_destino = None
-        tx = ty = None
-
-        if puerta_entrada:
-            props_in = self._props_to_dict(puerta_entrada)
-            if "spawn_x" in props_in and "spawn_y" in props_in:
-                tx = int(props_in["spawn_x"])
-                ty = int(props_in["spawn_y"])
-
-                spawn_door_id = props_in.get("spawn_door_id")
-                if spawn_door_id:
-                    for d in puertas_destino:
-                        if self._props_to_dict(d).get("id") == spawn_door_id:
-                            puerta_destino = d
-                            break
-
-        if tx is None or ty is None:
-            if puerta_entrada:
-                origen_path = self.map.json_path.replace("\\", "/").split("assets/")[-1]
-                for pd in puertas_destino:
-                    props_pd = self._props_to_dict(pd)
-                    map_prop = (props_pd.get("map") or "").replace("\\", "/")
-                    if map_prop.endswith(origen_path):
-                        puerta_destino = pd
-                        break
-
-            if puerta_destino is None:
-                puerta_destino = puertas_destino[0]
-
-            tx = int((puerta_destino["x"] + puerta_destino["width"] / 2) // TILE_SIZE)
-            ty = int((puerta_destino["y"] + puerta_destino["height"] / 2) // TILE_SIZE)
-
-        nuevo = WorldState(self.game, map_rel_path=destino, spawn_tile=(tx, ty))
-
-        if puerta_destino is not None:
-            nuevo.interactions.set_spawn_door_lock(
-                pygame.Rect(puerta_destino["x"], puerta_destino["y"], puerta_destino["width"], puerta_destino["height"]),
-                cooldown=0.15
-            )
-        else:
-            nuevo.interactions.set_cooldown(0.4)
-
-        self.game.change_state(nuevo)
-
-    # -------------------------------
-    # Map JSON helpers
-    # -------------------------------
-    def _load_map_json(self):
-        if self._map_json_cache is None:
-            with open(self.map.json_path, "r", encoding="utf-8") as f:
-                self._map_json_cache = json.load(f)
-        return self._map_json_cache
-
-    def _get_objectgroup(self, layer_name: str):
-        if layer_name in self._objectgroups_cache:
-            return self._objectgroups_cache[layer_name]
-
-        data = self._load_map_json()
-        for layer in data.get("layers", []):
-            if layer.get("type") == "objectgroup" and layer.get("name") == layer_name:
-                objs = layer.get("objects", [])
-                self._objectgroups_cache[layer_name] = objs
-                return objs
-
-        self._objectgroups_cache[layer_name] = []
-        return []
-
-    def _props_to_dict(self, obj) -> dict:
-        out = {}
-        for p in obj.get("properties", []) or []:
-            out[p.get("name")] = p.get("value")
-        return out
-
-    def _load_markers(self) -> dict:
-        markers = {}
-        for obj in self._get_objectgroup("markers"):
-            name = None
-            for prop in obj.get("properties", []):
-                if prop.get("name") == "id":
-                    name = prop.get("value")
-                    break
-            if not name:
-                continue
-            tx = int(obj["x"] // TILE_SIZE)
-            ty = int(obj["y"] // TILE_SIZE)
-            markers[name] = (tx, ty)
-        return markers
+        self.transitions.change_map(destino, puerta_entrada=puerta_entrada)
 
     # -------------------------------
     # Render
