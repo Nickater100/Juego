@@ -69,6 +69,8 @@ class AssignRolesSystem:
         # Esto es lo que habilita que el consejero aparezca en interiores por markers_static.
         try:
             self.ws.game.game_state.set_npc(str(npc_id), role=str(role))
+            if str(role) == "advisor":
+                self.ws.game.game_state.set_flag("advisor_chosen", True)
         except Exception:
             pass
 

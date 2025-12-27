@@ -2,48 +2,50 @@
   "version": 2,
   "current_map_id": "town_01",
   "player_tile": [
-    14,
-    10
+    11,
+    13
   ],
   "story_flags": {
     "intro_done": true
   },
   "party": [
     {
-      "id": "loren_valcrest",
-      "name": "Loren Valcrest"
-    },
-    {
       "id": "elinya_brightwell",
       "name": "Elinya Brightwell"
+    },
+    {
+      "id": "loren_valcrest",
+      "name": "Loren Valcrest"
     }
   ],
-  "bodyguards": [
-    "elinya_brightwell",
-    "loren_valcrest"
-  ],
+  "bodyguards": [],
   "npcs": {
-    "loren_valcrest": {
+    "marian_vell": {
+      "role": "advisor",
       "active": false,
       "map": null,
       "tile": null
     },
     "elinya_brightwell": {
+      "role": "soldier",
       "active": false,
       "map": null,
       "tile": null
     },
     "iraen_falk": {
+      "role": "inn",
+      "active": false,
+      "map": null,
+      "tile": null
+    },
+    "loren_valcrest": {
+      "role": "soldier",
       "active": false,
       "map": null,
       "tile": null
     },
     "selma_ironrose": {
-      "active": false,
-      "map": null,
-      "tile": null
-    },
-    "marian_vell": {
+      "role": "weapon_shop",
       "active": false,
       "map": null,
       "tile": null

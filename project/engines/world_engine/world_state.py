@@ -36,6 +36,7 @@ class WorldState:
         self.map_data = MapData(self.map.json_path, tile_size=TILE_SIZE)
 
         self.markers = self.map_data.load_markers()
+        self.markers_static = self.map_data.load_markers_static()
         self.doors = self.map_data.get_objectgroup("puertas")
         self.triggers = self.map_data.get_objectgroup("triggers")
 
@@ -70,6 +71,10 @@ class WorldState:
         self.assign_roles = AssignRolesSystem(self)
 
         self.map.npcs = self.npc_system.filter_map_npcs(getattr(self.map, "npcs", []) or [])
+        print("[DEBUG] game_state.npcs:", self.game.game_state.npcs)
+        print("[DEBUG] game_state.story_flags:", self.game.game_state.story_flags)
+        print("[DEBUG] markers_static:", self.markers_static)
+        self._apply_static_role_placements()
 
         self.event_runner = EventRunner(self)
         self._event_assignments = {}
@@ -613,3 +618,104 @@ class WorldState:
             # acá ignoramos a todos los bodyguards en la colisión,
             # pero mantenemos colisión con NPCs/mapa.
             ctrl.try_move(dx, dy, ignore_unit_ids=bg_set)
+
+    def _apply_static_role_placements(self) -> None:
+        """
+        Coloca NPCs con roles persistidos en markers_static.
+
+        Usa properties en Tiled (capa: markers_static):
+        - id (str) obligatorio
+        - role (str) obligatorio (ej: "advisor" o "consejero")
+        - slot (int) opcional (menor = prioridad)
+        - facing (str) opcional: up/down/left/right
+        - requires_flag (str) opcional
+
+        Importante:
+        - No toca markers de eventos.
+        - No depende de eventos: funciona al entrar al mapa.
+        """
+        gs = self.game.game_state
+
+        # construir role -> npc_id desde el estado persistido
+        role_to_npc: dict[str, str] = {}
+        try:
+            npcs = getattr(gs, "npcs", {}) or {}
+            for npc_id, st in npcs.items():
+                if not st:
+                    continue
+                r = st.get("role")
+                if r:
+                    role_to_npc[str(r)] = str(npc_id)
+        except Exception:
+            role_to_npc = {}
+
+        if not role_to_npc:
+            return  # no hay roles persistidos aún
+
+        # agrupar markers por role y ordenar por slot
+        buckets: dict[str, list[dict]] = {}
+        for m in (self.markers_static or []):
+            props = m.get("props") or {}
+            role = props.get("role")
+            if not role:
+                continue
+
+            req = props.get("requires_flag")
+            if req and not gs.get_flag(str(req), False):
+                continue
+
+            buckets.setdefault(str(role), []).append(m)
+
+        for role, arr in buckets.items():
+            def _slot_key(mm: dict) -> int:
+                try:
+                    return int((mm.get("props") or {}).get("slot", 0))
+                except Exception:
+                    return 0
+            arr.sort(key=_slot_key)
+
+        # aplicar: para cada role con marker, mover/spawnear al npc correspondiente
+        for role, arr in buckets.items():
+            npc_id = role_to_npc.get(role)
+            if not npc_id:
+                continue
+
+            # si fue reclutado, no debería aparecer como NPC del mapa
+            if gs.get_flag(f"recruited:{npc_id}", False):
+                continue
+
+            marker = arr[0]
+            tx, ty = marker.get("tile", (None, None))
+            if tx is None or ty is None:
+                continue
+
+            # spawn o mover
+            if npc_id not in self.npc_system.units:
+                try:
+                    self.npc_system.spawn_unit(npc_id, int(tx), int(ty))
+                except Exception:
+                    continue
+
+            u = self.npc_system.units.get(npc_id)
+            if not u:
+                continue
+
+            u.tile_x = int(tx)
+            u.tile_y = int(ty)
+            u.pixel_x = int(tx) * TILE_SIZE
+            u.pixel_y = int(ty) * TILE_SIZE
+            u.target_x = u.pixel_x
+            u.target_y = u.pixel_y
+            u.is_moving = False
+
+            # facing opcional
+            facing = (marker.get("props") or {}).get("facing")
+            if facing in ("up", "down", "left", "right"):
+                if facing == "up":
+                    u.set_facing(0, -1)
+                elif facing == "down":
+                    u.set_facing(0, 1)
+                elif facing == "left":
+                    u.set_facing(-1, 0)
+                elif facing == "right":
+                    u.set_facing(1, 0)

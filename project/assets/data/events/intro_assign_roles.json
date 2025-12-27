@@ -146,6 +146,14 @@
       }
     },
 
+      {
+        "type": "apply_role_spawns",
+        "map": "maps/world/in_house.json",
+        "role_to_marker": {
+          "advisor": "advisor_spot"
+        }
+      },
+
     {
       "type": "set_flag",
       "flag": "intro_done",
