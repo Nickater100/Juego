@@ -1,13 +1,14 @@
 {
   "version": 2,
-  "current_map_id": "maps/world/in_house.json",
+  "current_map_id": "maps/world/pueblo.json",
   "player_tile": [
-    16,
-    5
+    25,
+    19
   ],
   "story_flags": {
     "intro_done": true,
-    "advisor_chosen": true
+    "advisor_chosen": true,
+    "weapon_chosen": true
   },
   "party": [
     {

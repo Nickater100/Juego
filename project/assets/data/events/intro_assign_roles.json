@@ -36,7 +36,12 @@
           "type": "assign_roles",
           "npc_from": "last_talk",
           "roles": ["soldier", "advisor", "weapon_shop", "inn"],
-          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 },
+          "set_flag": {
+            "advisor": "advisor_chosen",
+            "weapon_shop": "weapon_chosen",
+            "inn": "inn_chosen"
+          }
         }
       ]
     },
@@ -54,7 +59,12 @@
           "type": "assign_roles",
           "npc_from": "last_talk",
           "roles": ["soldier", "advisor", "weapon_shop", "inn"],
-          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 },
+          "set_flag": {
+            "advisor": "advisor_chosen",
+            "weapon_shop": "weapon_chosen",
+            "inn": "inn_chosen"
+          }
         }
       ]
     },
@@ -72,7 +82,12 @@
           "type": "assign_roles",
           "npc_from": "last_talk",
           "roles": ["soldier", "advisor", "weapon_shop", "inn"],
-          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 }
+          "constraints": { "soldier": 2, "advisor": 1, "weapon_shop": 1, "inn": 1 },
+          "set_flag": {
+            "advisor": "advisor_chosen",
+            "weapon_shop": "weapon_chosen",
+            "inn": "inn_chosen"
+          }
         }
       ]
     },

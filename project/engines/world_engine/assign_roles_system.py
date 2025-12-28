@@ -69,8 +69,14 @@ class AssignRolesSystem:
         # Esto es lo que habilita que el consejero aparezca en interiores por markers_static.
         try:
             self.ws.game.game_state.set_npc(str(npc_id), role=str(role))
-            if str(role) == "advisor":
-                self.ws.game.game_state.set_flag("advisor_chosen", True)
+
+            # --- Activar flag dinámico si está definido en el step del evento ---
+            # El step original está en self.step (pasado desde el evento)
+            set_flag_map = self.step.get("set_flag", {}) or {}
+            # Puede ser: { "advisor": "advisor_chosen", "weapon_shop": "weapon_chosen" }
+            flag_name = set_flag_map.get(str(role))
+            if flag_name:
+                self.ws.game.game_state.set_flag(str(flag_name), True)
         except Exception:
             pass
 
