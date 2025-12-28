@@ -263,6 +263,7 @@ project/
 
 ---
 
+
 ## 📌 Estado actual del desarrollo
 
 - ✔️ Engine base funcional
@@ -270,10 +271,14 @@ project/
 - ✔️ Puertas estables
 - ✔️ Sistema de diálogo
 - ✔️ Sistema de NPC persistente
-- ✔️ Escena inicial diseñada e implementada parcialmente
+- ✔️ Markers estáticos para aparición dinámica de NPCs según rol y flag
+- ✔️ Asignación de roles y flags completamente data-driven (sin hardcode)
+- ✔️ Save/Load robusto: restaura mapa, posición y estado de NPCs
+- ✔️ Escena inicial implementada con eventos JSON y UI de asignación de roles
 - ✔️ Movimiento y despawn narrativo de NPCs
-- ⚠️ Event runner JSON (en progreso)
-- ⚠️ UI de asignación de roles (pendiente)
+- ✔️ Event runner JSON (implementado y flexible)
+- ✔️ UI de asignación de roles (implementada y dinámica)
+
 
 ---
 
