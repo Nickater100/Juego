@@ -83,7 +83,7 @@
                         {
                          "name":"map",
                          "type":"string",
-                         "value":"kingdom"
+                         "value":"maps\/world\/pueblo.json"
                         }],
                  "rotation":0,
                  "type":"",

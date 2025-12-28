@@ -40,7 +40,7 @@
   </object>
   <object id="33" x="768.049" y="397.003" width="45.8081" height="66.4217">
    <properties>
-    <property name="map" value="kingdom"/>
+    <property name="map" value="maps/world/pueblo.json"/>
    </properties>
   </object>
   <object id="34" x="12.979" y="119.864" width="34.3561" height="48.0985">
