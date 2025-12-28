@@ -80,6 +80,14 @@ class AssignRolesSystem:
         except Exception:
             pass
 
+
+        # DEBUG: Mostrar el estado de npcs y flags después de cada asignación
+        import pprint
+        print("[DEBUG] game_state.npcs:")
+        pprint.pprint(self.ws.game.game_state.npcs)
+        print("[DEBUG] story_flags:")
+        pprint.pprint(self.ws.game.game_state.story_flags)
+
         # aplicar outcomes (delegado)
         self.ws._apply_role_outcomes_for_npc(npc_id)
 
