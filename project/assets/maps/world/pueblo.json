@@ -547,6 +547,23 @@
                  "width":64.9027527496428,
                  "x":1152.97831355248,
                  "y":505.859690548686
+                }, 
+                {
+                 "height":57.2671347790965,
+                 "id":45,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"map",
+                         "type":"string",
+                         "value":"maps\/world\/inn.json"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":53.4493257938234,
+                 "x":1191.15640340521,
+                 "y":232.886348101659
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -555,7 +572,7 @@
          "y":0
         }],
  "nextlayerid":5,
- "nextobjectid":45,
+ "nextobjectid":46,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.11.2",
